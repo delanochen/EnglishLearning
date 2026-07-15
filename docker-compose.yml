@@ -1,0 +1,74 @@
+name: homelingua
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-homelingua}
+      POSTGRES_USER: ${POSTGRES_USER:-homelingua}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    networks: [internal]
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-homelingua}
+      POSTGRES_USER: ${POSTGRES_USER:-homelingua}
+      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:-System Administrator}
+      AUTH_TRUST_HOST: "true"
+      UPLOAD_DIR: /app/uploads
+      LOG_DIR: /app/logs
+    secrets: [postgres_password, auth_secret, settings_encryption_key, initial_admin_email, initial_admin_password]
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./backups:/backups
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health/ready"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    logging: *logging
+    networks: [internal]
+
+  adminer:
+    image: adminer:5
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:${ADMINER_PORT:-8080}:8080"
+    logging: *logging
+    networks: [internal]
+    profiles: [tools]
+
+secrets:
+  postgres_password: { file: ./secrets/postgres_password }
+  auth_secret: { file: ./secrets/auth_secret }
+  settings_encryption_key: { file: ./secrets/settings_encryption_key }
+  initial_admin_email: { file: ./secrets/initial_admin_email }
+  initial_admin_password: { file: ./secrets/initial_admin_password }
+
+networks:
+  internal: { driver: bridge }

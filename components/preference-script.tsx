@@ -1,0 +1,1 @@
+export function PreferenceScript() { return <script dangerouslySetInnerHTML={{ __html: `try{for(const k of ['dark','large-text'])if(localStorage.getItem(k)==='true')document.documentElement.classList.add(k)}catch(e){}` }} />; }

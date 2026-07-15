@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  PENDING
+}
+
+enum FamilyMemberType {
+  OWNER
+  PARENT
+  LEARNER
+  CHILD
+}
+
+enum MemberStatus {
+  ACTIVE
+  INVITED
+  ARCHIVED
+}
+
+enum RoleScope {
+  SYSTEM
+  FAMILY
+}
+
+enum AgeBand {
+  CHILD
+  TEEN
+  ADULT
+  SENIOR
+}
+
+enum CefrLevel {
+  PRE_A1
+  A1
+  A2
+  B1
+  B2
+  C1
+}
+
+enum OnboardingStatus {
+  PROFILE_PENDING
+  PLACEMENT_PENDING
+  READY
+}
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String?
+  email         String         @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  locale        String         @default("zh-CN")
+  status        UserStatus     @default(ACTIVE)
+  lastLoginAt   DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  familyMembers FamilyMember[]
+  ownedFamilies Family[]       @relation("FamilyOwner")
+  roles         UserRole[]
+  auditLogs     AuditLog[]     @relation("AuditActor")
+  loginAttempts LoginAttempt[]
+
+  @@index([status, deletedAt])
+}
+
+model Account {
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionToken String   @unique
+  userId       String   @db.Uuid
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Family {
+  id                 String         @id @default(uuid()) @db.Uuid
+  name               String
+  timezone           String         @default("America/Chicago")
+  locale             String         @default("zh-CN")
+  leaderboardEnabled Boolean        @default(false)
+  ownerUserId        String         @db.Uuid
+  deletedAt          DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  owner              User           @relation("FamilyOwner", fields: [ownerUserId], references: [id])
+  members            FamilyMember[]
+  userRoles          UserRole[]
+  auditLogs          AuditLog[]
+
+  @@index([ownerUserId, deletedAt])
+}
+
+model FamilyMember {
+  id             String           @id @default(uuid()) @db.Uuid
+  familyId       String           @db.Uuid
+  userId         String?          @db.Uuid
+  displayName    String
+  nickname       String?
+  memberType     FamilyMemberType
+  status         MemberStatus     @default(ACTIVE)
+  joinedAt       DateTime         @default(now())
+  deletedAt      DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  family         Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user           User?            @relation(fields: [userId], references: [id])
+  learnerProfile LearnerProfile?
+
+  @@unique([familyId, userId])
+  @@index([familyId, status, deletedAt])
+  @@index([userId])
+}
+
+model LearnerProfile {
+  id               String           @id @default(uuid()) @db.Uuid
+  familyMemberId   String           @unique @db.Uuid
+  ageBand          AgeBand
+  cefrLevel        CefrLevel?
+  goals            String[]
+  dailyMinutes     Int              @default(20)
+  interests        String[]
+  weakAreas        String[]
+  totalXp          Int              @default(0)
+  supportLanguage  String           @default("zh-CN")
+  onboardingStatus OnboardingStatus @default(PLACEMENT_PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  familyMember     FamilyMember     @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique
+  name        String
+  scope       RoleScope
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique
+  resource    String
+  action      String
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  roleId    String   @db.Uuid
+  familyId  String?  @db.Uuid
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  family    Family?  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId, familyId])
+  @@index([userId, familyId])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorUserId  String?  @db.Uuid
+  familyId     String?  @db.Uuid
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  ipHash       String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  actor        User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  family       Family?  @relation(fields: [familyId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([familyId, createdAt])
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid()) @db.Uuid
+  namespace   String
+  key         String
+  value       Json
+  isSensitive Boolean  @default(false)
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([namespace, key])
+}
+
+model LoginAttempt {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid
+  emailHash  String
+  ipHash     String
+  successful Boolean
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([emailHash, ipHash, createdAt])
+}
