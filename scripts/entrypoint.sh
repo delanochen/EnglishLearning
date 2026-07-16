@@ -3,7 +3,8 @@ set -eu
 
 export AUTH_SECRET="$(cat /run/secrets/auth_secret)"
 export POSTGRES_PASSWORD="$(cat /run/secrets/postgres_password)"
-export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?schema=public"
+POSTGRES_PASSWORD_ENCODED="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$POSTGRES_PASSWORD")"
+export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD_ENCODED}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?schema=public"
 
 echo "Applying database migrations..."
 ./node_modules/.bin/prisma migrate deploy
