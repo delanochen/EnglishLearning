@@ -2,11 +2,13 @@ import { randomUUID } from "node:crypto";
 import type { AIUsagePurpose } from "@prisma/client";
 import { db } from "@/lib/db";
 import { decryptSetting, getSettingsEncryptionKey } from "@/lib/settings-crypto";
+import { FixedWindowRateLimiter } from "@/lib/rate-limit";
 import { createProvider } from "./providers/factory";
 import { ProviderHttpError } from "./providers/base";
 import type { ChatInput, ChatResponse, StructuredInput } from "./types";
 
 type Candidate = Awaited<ReturnType<typeof loadCandidates>>[number];
+const userLimiter = new FixedWindowRateLimiter(30, 60_000);
 
 async function loadCandidates(purpose: AIUsagePurpose) {
   const route = await db.aIUsageRoute.findUnique({
@@ -39,6 +41,7 @@ async function instantiate(candidate: Candidate) {
 }
 
 export async function routedChat(purpose: AIUsagePurpose, input: Omit<ChatInput, "model">, userId?: string): Promise<ChatResponse> {
+  if (userId && !userLimiter.check(`${userId}:${purpose}`).allowed) throw new Error("AI_USER_RATE_LIMIT");
   const candidates = await loadCandidates(purpose);
   if (!candidates.length) throw new Error(`AI_ROUTE_NOT_CONFIGURED:${purpose}`);
   const requestId = randomUUID(); let fallbackFromId: string | undefined;

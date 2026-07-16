@@ -32,7 +32,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   })],
   callbacks: {
     jwt({ token, user }) { if (user?.id) token.userId = user.id; return token; },
-    session({ session, token }) { if (session.user) session.user.id = String(token.userId ?? token.sub); return session; },
+    async session({ session, token }) { if (session.user) { const userId = String(token.userId ?? token.sub); const current = await db.user.findUnique({ where: { id: userId }, select: { status: true, deletedAt: true } }); session.user.id = current?.status === "ACTIVE" && !current.deletedAt ? userId : ""; } return session; },
     authorized({ auth: session, request }) {
       const protectedPath = request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/admin") || request.nextUrl.pathname.startsWith("/family");
       return !protectedPath || Boolean(session?.user);
