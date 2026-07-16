@@ -13,6 +13,15 @@
 5. 使用群晖反向代理把 HTTPS 域名转发到 `http://127.0.0.1:3000`。
 6. WebSocket 无特殊配置要求；上传大小应同时在反向代理和应用层限制。
 
+群晖的 Compose 文件型 secrets 会保留宿主文件权限，而 app 以非 root 用户运行。部署前执行：
+
+```bash
+chmod 700 secrets
+chmod 644 secrets/*
+```
+
+这里的 `644` 用于让容器内的非 root 运行用户读取挂载文件；请通过群晖共享目录 ACL 限制其他 NAS 账号访问整个项目目录。
+
 不要通过群晖 UI 把 PostgreSQL 5432 暴露给局域网或互联网。Adminer 使用 `tools` profile，只在维护期间启动。
 
 ## 升级
