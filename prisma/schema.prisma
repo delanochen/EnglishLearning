@@ -190,6 +190,8 @@ model User {
   roles         UserRole[]
   auditLogs     AuditLog[]     @relation("AuditActor")
   loginAttempts LoginAttempt[]
+  uploadedFiles UploadedFile[]
+  notifications Notification[]
 
   @@index([status, deletedAt])
 }
@@ -246,6 +248,7 @@ model Family {
   members            FamilyMember[]
   userRoles          UserRole[]
   auditLogs          AuditLog[]
+  uploadedFiles      UploadedFile[]
 
   @@index([ownerUserId, deletedAt])
 }
@@ -302,6 +305,8 @@ model LearnerProfile {
   placementTests     PlacementTest[]
   studyStreak        StudyStreak?
   achievements       UserAchievement[]
+  notifications      Notification[]
+  uploadedFiles      UploadedFile[]
 }
 
 model Role {
@@ -1065,17 +1070,40 @@ model SpeakingSession {
 }
 
 model SpeakingAttempt {
-  id                  String          @id @default(uuid()) @db.Uuid
-  sessionId           String          @db.Uuid
+  id                  String                  @id @default(uuid()) @db.Uuid
+  sessionId           String                  @db.Uuid
   transcript          String
+  audioFileId         String?                 @db.Uuid
   recognitionProvider String
-  durationSeconds     Int             @default(0)
-  retryNo             Int             @default(1)
+  durationSeconds     Int                     @default(0)
+  retryNo             Int                     @default(1)
   fluencyScore        Float?
   accuracyScore       Float?
-  feedback            String?         @db.Text
-  createdAt           DateTime        @default(now())
-  session             SpeakingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  grammarScore        Float?
+  completenessScore   Float?
+  naturalnessScore    Float?
+  speechRateWpm       Float?
+  pauseCount          Int?
+  feedback            String?                 @db.Text
+  createdAt           DateTime                @default(now())
+  session             SpeakingSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  audioFile           UploadedFile?           @relation(fields: [audioFileId], references: [id], onDelete: SetNull)
+  pronunciation       PronunciationFeedback[]
+}
+
+model PronunciationFeedback {
+  id         String          @id @default(uuid()) @db.Uuid
+  attemptId  String          @db.Uuid
+  word       String
+  expected   String
+  observed   String?
+  score      Float
+  issueType  String?
+  suggestion String?
+  timestamps Json?
+  attempt    SpeakingAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId, score])
 }
 
 model WritingAssignment {
@@ -1160,4 +1188,45 @@ model PlacementTestAnswer {
   test             PlacementTest @relation(fields: [testId], references: [id], onDelete: Cascade)
 
   @@unique([testId, questionId])
+}
+
+model UploadedFile {
+  id               String            @id @default(uuid()) @db.Uuid
+  familyId         String            @db.Uuid
+  ownerUserId      String            @db.Uuid
+  learnerProfileId String?           @db.Uuid
+  storageKey       String            @unique
+  originalName     String
+  mimeType         String
+  size             Int
+  sha256           String
+  purpose          String
+  status           String            @default("READY")
+  deletedAt        DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  family           Family            @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  owner            User              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  learnerProfile   LearnerProfile?   @relation(fields: [learnerProfileId], references: [id], onDelete: SetNull)
+  speakingAttempts SpeakingAttempt[]
+
+  @@index([familyId, purpose, deletedAt])
+  @@index([ownerUserId, createdAt])
+}
+
+model Notification {
+  id               String          @id @default(uuid()) @db.Uuid
+  userId           String?         @db.Uuid
+  learnerProfileId String?         @db.Uuid
+  type             String
+  title            String
+  body             String
+  data             Json?
+  readAt           DateTime?
+  createdAt        DateTime        @default(now())
+  user             User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  learnerProfile   LearnerProfile? @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([learnerProfileId, readAt, createdAt])
 }
