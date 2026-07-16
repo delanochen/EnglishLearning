@@ -48,3 +48,13 @@ export async function changeUserRole(formData: FormData) {
   else await db.userRole.deleteMany({ where: { userId: input.userId, roleId: input.roleId, familyId: null } });
   await audit(actor.id, `ROLE_${input.operation.toUpperCase()}`, "UserRole", input.userId, { role: role.code }); revalidatePath("/admin/roles"); revalidatePath("/admin/users");
 }
+
+export async function createVocabulary(formData: FormData) {
+  const actor=await requireSystemAdmin();const input=z.object({word:z.string().trim().min(1).max(80),phonetic:z.string().trim().max(80).optional(),partOfSpeech:z.string().trim().min(1).max(40),definitionEn:z.string().trim().min(1).max(500),definitionZh:z.string().trim().min(1).max(500),level:z.enum(["PRE_A1","A1","A2","B1","B2","C1"]),topic:z.string().trim().min(1).max(80)}).parse(Object.fromEntries(formData));const row=await db.vocabulary.create({data:{word:input.word,phonetic:input.phonetic||null,partOfSpeech:input.partOfSpeech,definitionEn:input.definitionEn,level:input.level,topic:input.topic,status:"DRAFT",meanings:{create:{locale:"zh-CN",definition:input.definitionZh}}}});await audit(actor.id,"CONTENT_CREATED","Vocabulary",row.id);revalidatePath("/admin/content");
+}
+export async function createGrammarTopic(formData: FormData) {
+  const actor=await requireSystemAdmin();const input=z.object({slug:z.string().trim().min(1).max(80).regex(/^[a-z0-9-]+$/),title:z.string().trim().min(1).max(160),ruleEn:z.string().trim().min(1).max(3000),ruleZh:z.string().trim().min(1).max(3000),level:z.enum(["PRE_A1","A1","A2","B1","B2","C1"]),useCases:z.string().max(1000),commonErrors:z.string().max(1000)}).parse(Object.fromEntries(formData));const row=await db.grammarTopic.create({data:{slug:input.slug,title:input.title,ruleEn:input.ruleEn,ruleZh:input.ruleZh,level:input.level,status:"DRAFT",useCases:input.useCases.split("\n").map(x=>x.trim()).filter(Boolean),commonErrors:input.commonErrors.split("\n").map(x=>x.trim()).filter(Boolean)}});await audit(actor.id,"CONTENT_CREATED","GrammarTopic",row.id);revalidatePath("/admin/content");
+}
+export async function createScenarioLesson(formData: FormData) {
+  const actor=await requireSystemAdmin();const input=z.object({category:z.string().trim().min(1).max(100),title:z.string().trim().min(1).max(160),intro:z.string().trim().min(1).max(3000),level:z.enum(["PRE_A1","A1","A2","B1","B2","C1"])}).parse(Object.fromEntries(formData));const row=await db.scenarioLesson.create({data:{...input,status:"DRAFT",cultureTips:[],misunderstandings:[],naturalExpressions:[],sourceType:"ORIGINAL",sourceNote:"管理员原创内容"}});await audit(actor.id,"CONTENT_CREATED","ScenarioLesson",row.id);revalidatePath("/admin/content");
+}
