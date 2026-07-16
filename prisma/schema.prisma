@@ -53,6 +53,41 @@ enum OnboardingStatus {
   READY
 }
 
+enum AIProviderType {
+  OPENAI
+  OPENROUTER
+  GEMINI
+  OPENAI_COMPATIBLE
+  OLLAMA
+}
+
+enum AIModelStatus {
+  UNKNOWN
+  HEALTHY
+  DEGRADED
+  UNAVAILABLE
+}
+
+enum AIUsagePurpose {
+  TUTOR
+  VOCABULARY
+  READING
+  QUIZ
+  GRAMMAR
+  WRITING
+  LEARNING_PLAN
+  TRANSLATION
+  SPEECH_RECOGNITION
+  TTS
+  IMAGE_GENERATION
+  VIDEO_GENERATION
+}
+
+enum AIRequestStatus {
+  SUCCESS
+  FAILED
+}
+
 model User {
   id            String         @id @default(uuid()) @db.Uuid
   name          String?
@@ -259,4 +294,104 @@ model LoginAttempt {
   user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([emailHash, ipHash, createdAt])
+}
+
+model AIProvider {
+  id                  String         @id @default(uuid()) @db.Uuid
+  name                String         @unique
+  type                AIProviderType
+  baseUrl             String
+  encryptedApiKey     String?
+  apiKeyIv            String?
+  apiKeyAuthTag       String?
+  keyVersion          Int            @default(1)
+  enabled             Boolean        @default(true)
+  priority            Int            @default(100)
+  timeoutMs           Int            @default(30000)
+  notes               String?
+  lastConnectionAt    DateTime?
+  lastConnectionOk    Boolean?
+  lastConnectionMs    Int?
+  lastConnectionError String?
+  deletedAt           DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  models              AIModel[]
+  requestLogs         AIRequestLog[]
+
+  @@index([enabled, priority, deletedAt])
+}
+
+model AIModel {
+  id            String              @id @default(uuid()) @db.Uuid
+  providerId    String              @db.Uuid
+  name          String
+  displayName   String
+  capabilities  String[]
+  temperature   Float               @default(0.7)
+  maxTokens     Int                 @default(2048)
+  enabled       Boolean             @default(true)
+  isDefault     Boolean             @default(false)
+  priority      Int                 @default(100)
+  status        AIModelStatus       @default(UNKNOWN)
+  lastCheckedAt DateTime?
+  lastLatencyMs Int?
+  lastError     String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  provider      AIProvider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  routes        AIUsageRouteModel[]
+  requestLogs   AIRequestLog[]
+
+  @@unique([providerId, name])
+  @@index([enabled, priority, status])
+}
+
+model AIUsageRoute {
+  id        String              @id @default(uuid()) @db.Uuid
+  purpose   AIUsagePurpose      @unique
+  strategy  String              @default("PRIORITY_FAILOVER")
+  enabled   Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  models    AIUsageRouteModel[]
+}
+
+model AIUsageRouteModel {
+  id        String       @id @default(uuid()) @db.Uuid
+  routeId   String       @db.Uuid
+  modelId   String       @db.Uuid
+  priority  Int          @default(100)
+  enabled   Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  route     AIUsageRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  model     AIModel      @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@unique([routeId, modelId])
+  @@index([routeId, enabled, priority])
+}
+
+model AIRequestLog {
+  id             String          @id @default(uuid()) @db.Uuid
+  requestId      String
+  providerId     String          @db.Uuid
+  modelId        String          @db.Uuid
+  purpose        AIUsagePurpose
+  userId         String?         @db.Uuid
+  status         AIRequestStatus
+  latencyMs      Int
+  inputTokens    Int?
+  outputTokens   Int?
+  errorType      String?
+  errorMessage   String?
+  attemptNo      Int             @default(1)
+  fallbackFromId String?         @db.Uuid
+  createdAt      DateTime        @default(now())
+  provider       AIProvider      @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  model          AIModel         @relation(fields: [modelId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt])
+  @@index([purpose, status, createdAt])
+  @@index([providerId, modelId, createdAt])
 }

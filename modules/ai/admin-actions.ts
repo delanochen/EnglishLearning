@@ -1,0 +1,69 @@
+"use server";
+import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
+import { decryptSetting, encryptSetting, getSettingsEncryptionKey } from "@/lib/settings-crypto";
+import { requireSystemAdmin } from "@/modules/authorization/require-admin";
+import { createProvider } from "./providers/factory";
+import { idSchema, modelFormSchema, providerFormSchema, routeFormSchema } from "./schemas";
+
+export async function saveProvider(formData: FormData) {
+  const user = await requireSystemAdmin();
+  const input = providerFormSchema.parse(Object.fromEntries(formData));
+  if (input.type !== "OLLAMA" && !input.providerId && !input.apiKey) throw new Error("API_KEY_REQUIRED");
+  const encrypted = input.apiKey ? encryptSetting(input.apiKey, await getSettingsEncryptionKey()) : null;
+  const data = {
+    name: input.name, type: input.type, baseUrl: input.baseUrl.replace(/\/$/, ""), timeoutMs: input.timeoutMs, priority: input.priority, notes: input.notes || null,
+    ...(encrypted ? { encryptedApiKey: encrypted.ciphertext, apiKeyIv: encrypted.iv, apiKeyAuthTag: encrypted.authTag, keyVersion: encrypted.keyVersion } : {})
+  };
+  const provider = input.providerId
+    ? await db.aIProvider.update({ where: { id: input.providerId }, data })
+    : await db.aIProvider.create({ data });
+  await db.auditLog.create({ data: { actorUserId: user.id, action: input.providerId ? "ai-provider.update" : "ai-provider.create", resourceType: "AIProvider", resourceId: provider.id, metadata: { name: provider.name, type: provider.type } } });
+  revalidatePath("/admin/ai");
+}
+
+export async function addModel(formData: FormData) {
+  const user = await requireSystemAdmin();
+  const input = modelFormSchema.parse(Object.fromEntries(formData));
+  const model = await db.aIModel.create({ data: { ...input, capabilities: ["chat", "structured-output"] } });
+  await db.auditLog.create({ data: { actorUserId: user.id, action: "ai-model.create", resourceType: "AIModel", resourceId: model.id, metadata: { name: model.name, providerId: model.providerId } } });
+  revalidatePath("/admin/ai");
+}
+
+export async function toggleProvider(formData: FormData) {
+  const user = await requireSystemAdmin(); const { id } = idSchema.parse(Object.fromEntries(formData));
+  const current = await db.aIProvider.findUniqueOrThrow({ where: { id } });
+  await db.aIProvider.update({ where: { id }, data: { enabled: !current.enabled } });
+  await db.auditLog.create({ data: { actorUserId: user.id, action: current.enabled ? "ai-provider.disable" : "ai-provider.enable", resourceType: "AIProvider", resourceId: id } });
+  revalidatePath("/admin/ai");
+}
+
+export async function deleteProvider(formData: FormData) {
+  const user = await requireSystemAdmin(); const { id } = idSchema.parse(Object.fromEntries(formData));
+  await db.aIProvider.update({ where: { id }, data: { enabled: false, deletedAt: new Date() } });
+  await db.auditLog.create({ data: { actorUserId: user.id, action: "ai-provider.delete", resourceType: "AIProvider", resourceId: id } });
+  revalidatePath("/admin/ai");
+}
+
+export async function testProvider(formData: FormData) {
+  await requireSystemAdmin(); const { id } = idSchema.parse(Object.fromEntries(formData));
+  const provider = await db.aIProvider.findUniqueOrThrow({ where: { id }, include: { models: { where: { enabled: true }, orderBy: { priority: "asc" }, take: 1 } } });
+  const model = provider.models[0];
+  if (!model) throw new Error("MODEL_REQUIRED");
+  const apiKey = provider.encryptedApiKey && provider.apiKeyIv && provider.apiKeyAuthTag
+    ? decryptSetting({ ciphertext: provider.encryptedApiKey, iv: provider.apiKeyIv, authTag: provider.apiKeyAuthTag, keyVersion: provider.keyVersion }, await getSettingsEncryptionKey()) : null;
+  const result = await createProvider(provider.type, provider.baseUrl, apiKey, provider.timeoutMs).testConnection(model.name);
+  await db.$transaction([
+    db.aIProvider.update({ where: { id }, data: { lastConnectionAt: new Date(), lastConnectionOk: result.ok, lastConnectionMs: result.latencyMs, lastConnectionError: result.ok ? null : result.message } }),
+    db.aIModel.update({ where: { id: model.id }, data: { status: result.ok ? "HEALTHY" : "UNAVAILABLE", lastCheckedAt: new Date(), lastLatencyMs: result.latencyMs, lastError: result.ok ? null : result.message } })
+  ]);
+  revalidatePath("/admin/ai");
+}
+
+export async function saveRoute(formData: FormData) {
+  const user = await requireSystemAdmin(); const input = routeFormSchema.parse(Object.fromEntries(formData));
+  const route = await db.aIUsageRoute.upsert({ where: { purpose: input.purpose }, update: { enabled: true }, create: { purpose: input.purpose } });
+  await db.aIUsageRouteModel.upsert({ where: { routeId_modelId: { routeId: route.id, modelId: input.modelId } }, update: { priority: input.priority, enabled: true }, create: { routeId: route.id, modelId: input.modelId, priority: input.priority } });
+  await db.auditLog.create({ data: { actorUserId: user.id, action: "ai-route.update", resourceType: "AIUsageRoute", resourceId: route.id, metadata: input } });
+  revalidatePath("/admin/ai");
+}
