@@ -1,10 +1,18 @@
 import Link from "next/link";
-import { Home, Users, ShieldCheck, LogOut } from "lucide-react";
+import { Home, Users, ShieldCheck, LogOut, MessageCircle, BookOpen, ListChecks, Languages } from "lucide-react";
 import { Preferences } from "./preferences";
 import { logoutAction } from "@/modules/identity/actions";
 
 export function AppShell({ children, userName, isAdmin }: { children: React.ReactNode; userName: string; isAdmin: boolean }) {
-  const links = [{ href: "/dashboard", label: "首页", icon: Home }, { href: "/family", label: "家庭", icon: Users }, ...(isAdmin ? [{ href: "/admin", label: "管理", icon: ShieldCheck }] : [])];
+  const links = [
+    { href: "/dashboard", label: "首页", icon: Home },
+    { href: "/learn/tutor", label: "AI 老师", icon: MessageCircle },
+    { href: "/learn/vocabulary", label: "单词", icon: Languages },
+    { href: "/learn/reading", label: "阅读", icon: BookOpen },
+    { href: "/tasks", label: "每日任务", icon: ListChecks },
+    { href: "/family", label: "家庭", icon: Users },
+    ...(isAdmin ? [{ href: "/admin", label: "管理", icon: ShieldCheck }] : [])
+  ];
   return <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
     <aside className="border-b border-slate-200 bg-white/80 p-5 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 lg:min-h-screen lg:border-b-0 lg:border-r">
       <div className="flex items-center justify-between lg:block"><Link href="/dashboard" className="text-xl font-black text-brand">HomeLingua</Link><Preferences /></div>
