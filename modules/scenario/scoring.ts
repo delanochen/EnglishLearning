@@ -1,0 +1,1 @@
+export function scoreScenarioAnswers(answerKeys: string[], answers: string[]) { if (!answerKeys.length) return 1; const correct = answerKeys.filter((key, index) => key.trim().toLowerCase() === (answers[index] ?? "").trim().toLowerCase()).length; return correct / answerKeys.length; }

@@ -158,6 +158,12 @@ enum PlanItemStatus {
   SKIPPED
 }
 
+enum ScenarioSourceType {
+  ORIGINAL
+  AI_GENERATED
+  ADAPTED
+}
+
 model User {
   id            String         @id @default(uuid()) @db.Uuid
   name          String?
@@ -286,6 +292,7 @@ model LearnerProfile {
   learningPlans      LearningPlan[]
   weeklyReports      WeeklyReport[]
   monthlyReports     MonthlyReport[]
+  scenarioProgress   ScenarioProgress[]
 }
 
 model Role {
@@ -753,6 +760,85 @@ model MonthlyReport {
   learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
 
   @@unique([learnerProfileId, periodStart, version])
+}
+
+model ScenarioLesson {
+  id                 String             @id @default(uuid()) @db.Uuid
+  category           String
+  title              String
+  intro              String             @db.Text
+  level              CefrLevel
+  cultureTips        String[]
+  misunderstandings  String[]
+  naturalExpressions String[]
+  sourceType         ScenarioSourceType @default(ORIGINAL)
+  sourceNote         String?
+  status             ContentStatus      @default(PUBLISHED)
+  version            Int                @default(1)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  dialogues          ScenarioDialogue[]
+  exercises          ScenarioExercise[]
+  videoLesson        VideoLesson?
+  progress           ScenarioProgress[]
+
+  @@unique([category, title, version])
+  @@index([category, level, status])
+}
+
+model ScenarioDialogue {
+  id        String         @id @default(uuid()) @db.Uuid
+  lessonId  String         @db.Uuid
+  speaker   String
+  roleName  String
+  textEn    String         @db.Text
+  textZh    String?        @db.Text
+  audioUrl  String?
+  sequence  Int
+  cameraCue String?
+  lesson    ScenarioLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, sequence])
+}
+
+model ScenarioExercise {
+  id          String         @id @default(uuid()) @db.Uuid
+  lessonId    String         @db.Uuid
+  type        QuestionType
+  prompt      String
+  answerKey   String
+  options     Json?
+  explanation String?
+  order       Int
+  lesson      ScenarioLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, order])
+}
+
+model VideoLesson {
+  id               String         @id @default(uuid()) @db.Uuid
+  scenarioLessonId String         @unique @db.Uuid
+  title            String
+  timeline         Json
+  durationSeconds  Int
+  status           ContentStatus  @default(PUBLISHED)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  scenarioLesson   ScenarioLesson @relation(fields: [scenarioLessonId], references: [id], onDelete: Cascade)
+}
+
+model ScenarioProgress {
+  id               String         @id @default(uuid()) @db.Uuid
+  learnerProfileId String         @db.Uuid
+  lessonId         String         @db.Uuid
+  progressPercent  Int            @default(0)
+  score            Float?
+  completedAt      DateTime?
+  lastDialogue     Int            @default(0)
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  lesson           ScenarioLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([learnerProfileId, lessonId])
 }
 
 model TaskCompletion {

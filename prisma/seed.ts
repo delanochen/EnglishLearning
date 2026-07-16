@@ -71,6 +71,18 @@ async function main() {
   for (const question of listeningQuestions) await db.listeningQuestion.upsert({ where: { exerciseId_order: { exerciseId: listening.id, order: question.order } }, update: question, create: { exerciseId: listening.id, ...question } });
 
   if (!await db.writingAssignment.findFirst({ where: { title: "Introduce Your Daily Routine", level: CefrLevel.A2 } })) await db.writingAssignment.create({ data: { title: "Introduce Your Daily Routine", type: "PARAGRAPH", prompt: "Write a short paragraph about your weekday routine. Say when you get up, what you do during the day, and what you do in the evening.", level: CefrLevel.A2, targetWords: 80 } });
+
+  const scenario = await db.scenarioLesson.upsert({ where: { category_title_version: { category: "餐厅与咖啡店", title: "在咖啡店自然点单", version: 1 } }, update: {}, create: { category: "餐厅与咖啡店", title: "在咖啡店自然点单", intro: "学习在美国咖啡店选择杯型、说明定制要求并礼貌回应店员。", level: CefrLevel.A2, cultureTips: ["店员询问名字通常是为了标记订单，不是正式介绍。", "Would you like room for cream? 是询问是否要给奶油留空间。"], misunderstandings: ["A regular coffee 有时表示滴滤咖啡，但不同地区含义可能不同。", "For here or to go? 是询问堂食还是带走。"], naturalExpressions: ["Could I get a medium latte?", "Can I have that with oat milk?", "That's all, thank you."], sourceType: "ORIGINAL", sourceNote: "HomeLingua 原创家庭学习内容" } });
+  const dialogueRows = [
+    { sequence: 1, speaker: "Barista", roleName: "咖啡师", textEn: "Hi! What can I get started for you?", textZh: "你好！想喝点什么？", cameraCue: "咖啡师微笑迎接顾客" },
+    { sequence: 2, speaker: "Customer", roleName: "顾客", textEn: "Could I get a medium latte with oat milk, please?", textZh: "请给我一杯用燕麦奶做的中杯拿铁。", cameraCue: "顾客查看菜单后点单" },
+    { sequence: 3, speaker: "Barista", roleName: "咖啡师", textEn: "Sure. Is that for here or to go?", textZh: "好的。堂食还是带走？", cameraCue: "咖啡师在收银机上确认订单" },
+    { sequence: 4, speaker: "Customer", roleName: "顾客", textEn: "To go, please. That's all, thank you.", textZh: "带走。就这些，谢谢。", cameraCue: "顾客完成订单" }
+  ];
+  for (const row of dialogueRows) await db.scenarioDialogue.upsert({ where: { lessonId_sequence: { lessonId: scenario.id, sequence: row.sequence } }, update: row, create: { lessonId: scenario.id, ...row } });
+  const scenarioQuestions = [{ order: 1, prompt: "Which milk does the customer request?", options: ["Whole milk", "Oat milk", "Soy milk"], answerKey: "Oat milk", explanation: "The customer asks for oat milk." }, { order: 2, prompt: "Is the order for here or to go?", options: ["For here", "To go"], answerKey: "To go", explanation: "The customer says 'To go, please.'" }];
+  for (const row of scenarioQuestions) await db.scenarioExercise.upsert({ where: { lessonId_order: { lessonId: scenario.id, order: row.order } }, update: row, create: { lessonId: scenario.id, type: QuestionType.MULTIPLE_CHOICE, ...row } });
+  await db.videoLesson.upsert({ where: { scenarioLessonId: scenario.id }, update: {}, create: { scenarioLessonId: scenario.id, title: "咖啡店点单图文时间线", durationSeconds: 150, timeline: [{ at: 0, title: "进入咖啡店", note: "先查看菜单和排队方式" }, { at: 30, title: "说明饮品", note: "杯型、饮品、奶类和温度" }, { at: 90, title: "确认方式", note: "For here or to go" }, { at: 125, title: "付款取餐", note: "听取名字或订单号" }] } });
 }
 
 main().finally(() => db.$disconnect());
