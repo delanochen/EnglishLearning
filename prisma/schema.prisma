@@ -88,6 +88,58 @@ enum AIRequestStatus {
   FAILED
 }
 
+enum TeacherStyle {
+  GENTLE
+  STRICT
+  CHILD
+  ACADEMIC
+  US_LIFE
+  WORKPLACE
+}
+
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum VocabularyState {
+  NEW
+  LEARNING
+  REVIEW
+  MASTERED
+}
+
+enum DailyTaskType {
+  VOCABULARY
+  READING
+  LISTENING
+  SPEAKING
+  AI_TUTOR
+  GRAMMAR
+  WRITING
+  QUIZ
+}
+
+enum DailyTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  VOCABULARY
+}
+
 model User {
   id            String         @id @default(uuid()) @db.Uuid
   name          String?
@@ -189,20 +241,25 @@ model FamilyMember {
 }
 
 model LearnerProfile {
-  id               String           @id @default(uuid()) @db.Uuid
-  familyMemberId   String           @unique @db.Uuid
-  ageBand          AgeBand
-  cefrLevel        CefrLevel?
-  goals            String[]
-  dailyMinutes     Int              @default(20)
-  interests        String[]
-  weakAreas        String[]
-  totalXp          Int              @default(0)
-  supportLanguage  String           @default("zh-CN")
-  onboardingStatus OnboardingStatus @default(PLACEMENT_PENDING)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  familyMember     FamilyMember     @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+  id                 String                   @id @default(uuid()) @db.Uuid
+  familyMemberId     String                   @unique @db.Uuid
+  ageBand            AgeBand
+  cefrLevel          CefrLevel?
+  goals              String[]
+  dailyMinutes       Int                      @default(20)
+  interests          String[]
+  weakAreas          String[]
+  totalXp            Int                      @default(0)
+  supportLanguage    String                   @default("zh-CN")
+  onboardingStatus   OnboardingStatus         @default(PLACEMENT_PENDING)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  familyMember       FamilyMember             @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+  conversations      AIConversation[]
+  vocabularyProgress UserVocabularyProgress[]
+  readingProgress    ReadingProgress[]
+  dailyTasks         DailyTask[]
+  activities         LearningActivity[]
 }
 
 model Role {
@@ -394,4 +451,239 @@ model AIRequestLog {
   @@index([createdAt])
   @@index([purpose, status, createdAt])
   @@index([providerId, modelId, createdAt])
+}
+
+model AIConversation {
+  id               String             @id @default(uuid()) @db.Uuid
+  learnerProfileId String             @db.Uuid
+  teacherStyle     TeacherStyle       @default(GENTLE)
+  topic            String
+  levelSnapshot    CefrLevel?
+  status           ConversationStatus @default(ACTIVE)
+  summary          String?
+  lastMessageAt    DateTime           @default(now())
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  learnerProfile   LearnerProfile     @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  messages         AIMessage[]
+
+  @@index([learnerProfileId, lastMessageAt])
+}
+
+model AIMessage {
+  id             String         @id @default(uuid()) @db.Uuid
+  conversationId String         @db.Uuid
+  role           String
+  content        String         @db.Text
+  contentZh      String?        @db.Text
+  inputTokens    Int?
+  outputTokens   Int?
+  savedForReview Boolean        @default(false)
+  sequence       Int
+  createdAt      DateTime       @default(now())
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, sequence])
+}
+
+model Vocabulary {
+  id           String                   @id @default(uuid()) @db.Uuid
+  word         String
+  phonetic     String?
+  partOfSpeech String?
+  definitionEn String
+  level        CefrLevel
+  topic        String
+  audioUrl     String?
+  imageUrl     String?
+  status       ContentStatus            @default(PUBLISHED)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  meanings     VocabularyMeaning[]
+  examples     VocabularyExample[]
+  progress     UserVocabularyProgress[]
+
+  @@unique([word, partOfSpeech])
+  @@index([level, topic, status])
+}
+
+model VocabularyMeaning {
+  id           String     @id @default(uuid()) @db.Uuid
+  vocabularyId String     @db.Uuid
+  locale       String
+  definition   String
+  senseOrder   Int        @default(1)
+  vocabulary   Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+
+  @@unique([vocabularyId, locale, senseOrder])
+}
+
+model VocabularyExample {
+  id           String     @id @default(uuid()) @db.Uuid
+  vocabularyId String     @db.Uuid
+  sentence     String
+  translation  String?
+  collocations String[]
+  difficulty   CefrLevel
+  vocabulary   Vocabulary @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+}
+
+model UserVocabularyProgress {
+  id                 String           @id @default(uuid()) @db.Uuid
+  learnerProfileId   String           @db.Uuid
+  vocabularyId       String           @db.Uuid
+  state              VocabularyState  @default(NEW)
+  firstLearnedAt     DateTime?
+  lastReviewedAt     DateTime?
+  nextReviewAt       DateTime?
+  correctCount       Int              @default(0)
+  incorrectCount     Int              @default(0)
+  mastery            Float            @default(0)
+  easeFactor         Float            @default(2.5)
+  intervalDays       Int              @default(0)
+  consecutiveCorrect Int              @default(0)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  learnerProfile     LearnerProfile   @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  vocabulary         Vocabulary       @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+  reviews            ReviewSchedule[]
+
+  @@unique([learnerProfileId, vocabularyId])
+  @@index([learnerProfileId, nextReviewAt, state])
+}
+
+model ReviewSchedule {
+  id          String                 @id @default(uuid()) @db.Uuid
+  progressId  String                 @db.Uuid
+  scheduledAt DateTime
+  completedAt DateTime?
+  result      Boolean?
+  quality     Int?
+  oldInterval Int
+  newInterval Int?
+  oldEase     Float
+  newEase     Float?
+  createdAt   DateTime               @default(now())
+  progress    UserVocabularyProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledAt, completedAt])
+}
+
+model ReadingArticle {
+  id               String            @id @default(uuid()) @db.Uuid
+  title            String
+  body             String            @db.Text
+  translation      String?           @db.Text
+  level            CefrLevel
+  audience         String
+  wordCount        Int
+  topic            String
+  targetVocabulary String[]
+  targetGrammar    String[]
+  status           ContentStatus     @default(PUBLISHED)
+  aiGenerated      Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  questions        ReadingQuestion[]
+  progress         ReadingProgress[]
+
+  @@index([level, topic, status])
+}
+
+model ReadingQuestion {
+  id          String          @id @default(uuid()) @db.Uuid
+  articleId   String          @db.Uuid
+  type        QuestionType
+  prompt      String
+  options     Json?
+  answerKey   String
+  explanation String?
+  order       Int
+  article     ReadingArticle  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  answers     ReadingAnswer[]
+
+  @@unique([articleId, order])
+}
+
+model ReadingProgress {
+  id               String          @id @default(uuid()) @db.Uuid
+  learnerProfileId String          @db.Uuid
+  articleId        String          @db.Uuid
+  progressPercent  Int             @default(0)
+  currentPosition  Int             @default(0)
+  startedAt        DateTime        @default(now())
+  completedAt      DateTime?
+  readingSeconds   Int             @default(0)
+  score            Float?
+  learnerProfile   LearnerProfile  @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  article          ReadingArticle  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  answers          ReadingAnswer[]
+
+  @@unique([learnerProfileId, articleId])
+}
+
+model ReadingAnswer {
+  id         String          @id @default(uuid()) @db.Uuid
+  progressId String          @db.Uuid
+  questionId String          @db.Uuid
+  answer     String
+  isCorrect  Boolean?
+  score      Float?
+  feedback   String?
+  createdAt  DateTime        @default(now())
+  progress   ReadingProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  question   ReadingQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model DailyTask {
+  id               String           @id @default(uuid()) @db.Uuid
+  learnerProfileId String           @db.Uuid
+  taskDate         DateTime         @db.Date
+  taskType         DailyTaskType
+  title            String
+  description      String?
+  contentRefType   String?
+  contentRefId     String?
+  estimatedMinutes Int
+  status           DailyTaskStatus  @default(PENDING)
+  xpReward         Int              @default(10)
+  generationReason String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  learnerProfile   LearnerProfile   @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  completions      TaskCompletion[]
+
+  @@index([learnerProfileId, taskDate, status])
+}
+
+model TaskCompletion {
+  id               String    @id @default(uuid()) @db.Uuid
+  taskId           String    @db.Uuid
+  attemptNo        Int       @default(1)
+  startedAt        DateTime?
+  completedAt      DateTime  @default(now())
+  durationSeconds  Int
+  accuracy         Float?
+  earnedXp         Int
+  unfinishedReason String?
+  needsMakeup      Boolean   @default(false)
+  task             DailyTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model LearningActivity {
+  id               String         @id @default(uuid()) @db.Uuid
+  learnerProfileId String         @db.Uuid
+  familyId         String         @db.Uuid
+  activityType     String
+  module           String
+  durationSeconds  Int            @default(0)
+  score            Float?
+  sourceType       String?
+  sourceId         String?
+  occurredAt       DateTime       @default(now())
+  createdAt        DateTime       @default(now())
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+
+  @@index([learnerProfileId, occurredAt])
+  @@index([familyId, occurredAt])
 }
