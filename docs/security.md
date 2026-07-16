@@ -1,27 +1,23 @@
-# 阶段 1 安全说明
+# 安全说明
 
 ## 已落实
 
-- 密码使用 Argon2id 哈希，不保存明文。
-- Auth.js 签名 secret 来自 Docker secret。
-- 登录失败按邮箱哈希和 IP 哈希组合限流；日志不保存原始密码。
-- 受保护布局和所有写操作在服务端验证会话。
-- 家庭操作同时验证 RBAC 与 familyId 归属。
-- 管理后台不只依赖前端导航隐藏，页面服务端再次验证 SystemAdmin。
-- Prisma 参数化查询降低 SQL 注入风险。
-- 全局设置 nosniff、DENY frame、referrer policy 和浏览器能力策略。
-- 审计日志记录家庭和成员创建等敏感写操作。
-- Docker 日志配置大小和文件数轮转。
+- 密码使用 Argon2id；Auth.js secret 来自 Docker secret。
+- 登录失败按邮箱哈希与 IP 哈希限流，认证 API 另有固定窗口限流和 `Retry-After`。
+- 所有敏感写操作重新验证 Session、RBAC、familyId 或 learnerProfileId 归属。
+- AI API Key 使用 AES-256-GCM 加密，只在服务端通过独立主密钥解密；日志不保存 Key 或完整 prompt。
+- 全局设置 CSP、frame deny、nosniff、严格 referrer、浏览器能力和 opener policy。
+- Server Action 请求体限制为 2 MB；上传工具提供 MIME、扩展名、大小、魔数白名单和随机存储名。
+- Service Worker 只缓存离线壳、图标和构建静态资源，不缓存受保护页面或 API。
+- Docker 使用非 root app 用户、内部数据库网络、日志大小轮转和文件型 secrets。
+- PostgreSQL 与 uploads 联合备份提供 SHA-256 清单；恢复必须显式确认并先解压到 staging。
 
-## 设计说明
+## 部署边界
 
-Auth.js Credentials Provider 当前使用短期签名 JWT Session；每次敏感请求仍从数据库重新加载角色和家庭关系，因此权限变更即时生效，JWT 中不保存角色权限。后续如切换无密码登录或 OAuth，可改为数据库 Session。
+HomeLingua 默认面向家庭局域网。若需要外网访问，必须通过 HTTPS 反向代理或可信 VPN；不要暴露 PostgreSQL 或 Adminer。反向代理应覆盖 HSTS、证书续期、请求体上限和可信来源 IP 设置。
 
-## 尚未进入阶段 1 的能力
+当前 CSP 为兼容 Next.js 内联启动脚本保留 `'unsafe-inline'`。后续升级框架时可评估 nonce；这不影响 `frame-ancestors 'none'`、`object-src 'none'` 和同源 connect 等限制。
 
-- AI API Key AES-256-GCM 加密、遮盖和密钥轮换：阶段 2。
-- 用户文件上传白名单、魔数检查和私有下载：对应学习模块引入上传时实施。
-- 完整 CSP nonce、反向代理可信 IP 配置和分布式限流：阶段 7 加固。
-- 后台备份/恢复、文件清单和恢复审计：阶段 7。
+内存 API 限流适用于默认单 app 容器；若扩展为多实例，需要改用 Redis 或共享数据库限流。浏览器 Web Speech API 的音频处理行为由浏览器供应商决定，敏感语音场景应关闭该能力或使用受控的本地识别服务。
 
-在这些能力完成前，不应把平台直接暴露到互联网。推荐仅在家庭局域网或 VPN 中使用，外部访问必须经过 HTTPS 反向代理和额外访问控制。
+依赖升级前运行 `pnpm audit`，并在测试环境完成 lint、typecheck、unit、E2E、build 和数据库恢复演练。

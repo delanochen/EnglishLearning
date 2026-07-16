@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function OfflinePage() { return <main className="grid min-h-screen place-items-center p-6"><section className="card max-w-lg text-center"><p className="text-sm font-bold uppercase tracking-[.2em] text-brand">Offline</p><h1 className="mt-3 text-3xl font-black">当前无法连接家庭 NAS</h1><p className="mt-4 text-muted">请确认设备连接到家庭网络，或者检查 NAS 和 HomeLingua 容器是否正在运行。学习数据不会写入离线缓存。</p><Link className="button-primary mt-6 inline-block" href="/dashboard">重新连接</Link></section></main>; }

@@ -1,48 +1,54 @@
 # Docker 与群晖部署说明
 
-## 持久化与备份边界
+## 持久化边界
 
-必须备份 `data/postgres`、`uploads` 和 `secrets`。其中 `secrets/settings_encryption_key` 必须单独安全保管，不能与普通数据库备份放在同一位置。`logs` 可按保留策略归档，`backups` 用于后续阶段生成的正式备份。
+项目使用以下宿主目录：`data/postgres`、`uploads`、`logs`、`backups` 和 `secrets`。`settings_encryption_key` 必须单独离线保存；缺少原密钥将无法解密已有 AI Provider Key。
 
-## 群晖建议
+## 群晖首次部署
 
-1. 在共享文件夹创建 `homelingua`，把仓库放入该目录。
-2. 确保容器管理器可读取 secret 文件，且这些文件仅管理员可读。
-3. 在 Container Manager 的项目中选择 `docker-compose.yml`。
-4. 首次构建可能需要数分钟；等待 app 和 postgres 显示 healthy。
-5. 使用群晖反向代理把 HTTPS 域名转发到 `http://127.0.0.1:3000`。
-6. WebSocket 无特殊配置要求；上传大小应同时在反向代理和应用层限制。
+1. 将仓库放在 `/volume2/docker/EnglishLearning`。
+2. 创建 `.env` 和五个无 `.example` 后缀的 secret 文件。
+3. 通过共享目录 ACL 限制项目访问，并执行：
 
-群晖的 Compose 文件型 secrets 会保留宿主文件权限，而 app 以非 root 用户运行。部署前执行：
+   ```bash
+   cd /volume2/docker/EnglishLearning
+   chmod 700 secrets
+   chmod 644 secrets/*
+   docker compose config
+   docker compose up -d --build
+   docker compose ps
+   curl -f http://127.0.0.1:3000/api/health/ready
+   ```
 
-```bash
-chmod 700 secrets
-chmod 644 secrets/*
-```
+4. 浏览器打开 `http://NAS-IP:3000`。外网访问必须使用 HTTPS 反向代理或可信 VPN。
 
-这里的 `644` 用于让容器内的非 root 运行用户读取挂载文件；请通过群晖共享目录 ACL 限制其他 NAS 账号访问整个项目目录。
-
-不要通过群晖 UI 把 PostgreSQL 5432 暴露给局域网或互联网。Adminer 使用 `tools` profile，只在维护期间启动。
-
-## 升级
-
-升级前备份数据库、uploads 和 secrets。拉取新版本后执行：
+app 使用非 root 用户；PostgreSQL 只在 Compose 内部网络开放。Adminer 位于 `tools` profile，并只绑定 `127.0.0.1`：
 
 ```bash
-docker compose build --pull app
-docker compose up -d
-docker compose ps
+docker compose --profile tools up -d adminer
 ```
 
-入口脚本只运行 `prisma migrate deploy`，不会执行开发用迁移或数据库重置。升级后检查 `/api/health/ready` 和登录流程。
+## 备份、升级和回滚
+
+- [备份与恢复](backup-restore.md)
+- [群晖升级与回滚](upgrade-rollback.md)
+
+升级前必须生成正式备份并保留原 secrets。容器入口只运行 `prisma migrate deploy`、幂等 seed 和管理员初始化，不执行数据库 reset。
 
 ## 故障排查
 
-- app 一直 restarting：查看 `docker compose logs app`，检查 secret 是否存在、管理员密码长度及数据库健康。
-- ready 返回 503：响应会指出 database、uploads 或 logs 中哪个检查失败。
-- 无法登录：确认邮箱为小写形式，检查账号是否禁用，以及 15 分钟内是否达到失败次数限制。
-- NAS 重启后无数据：确认 Compose 工作目录没变化，并检查 `./data/postgres` 的实际挂载路径。
+```bash
+cd /volume2/docker/EnglishLearning
+docker compose config
+docker compose ps -a
+docker compose logs --tail=300 app postgres
+curl -v http://127.0.0.1:3000/api/health/live
+curl -v http://127.0.0.1:3000/api/health/ready
+```
 
-## 当前备份状态
-
-阶段 1 仅提供目录和部署边界；后台手动/定时备份、下载、恢复与审计将在阶段 7 实现。在此之前可在维护窗口使用 PostgreSQL 官方 `pg_dump`，并同时归档 uploads。恢复流程必须先在非生产目录演练。
+- app restarting：确认 secrets 文件存在且可由容器读取，查看迁移和初始化日志。
+- ready 返回 503：响应会标出 database、uploads 或 logs 的失败项。
+- 浏览器拒绝连接：确认 app 为 `Up`，并显示 `0.0.0.0:3000->3000/tcp`。
+- `not a git repository` 或找不到 Compose：先执行正确的 `cd`，不要在 `/root` 目录运行项目命令。
+- `dubious ownership`：执行 `git config --global --add safe.directory /volume2/docker/EnglishLearning`。
+- 无法登录：确认邮箱小写、账号未禁用，并检查登录失败限流。
