@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { getAccessContext } from "@/modules/authorization/context";
 import { canManageFamily } from "@/modules/authorization/policy";
-import { familySchema, memberSchema } from "./schemas";
+import { familySchema, familyUpdateSchema, memberSchema, memberStateSchema, memberUpdateSchema } from "./schemas";
 
 export async function createFamily(formData: FormData) {
   const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED");
@@ -19,6 +19,19 @@ export async function createFamily(formData: FormData) {
   revalidatePath("/family");
 }
 
+export async function updateFamily(formData: FormData) {
+  const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED");
+  const input = familyUpdateSchema.parse(Object.fromEntries(formData));
+  const context = await getAccessContext(session.user.id); if (!canManageFamily(context, input.familyId)) throw new Error("FORBIDDEN");
+  const existing = await db.family.findFirst({ where: { id: input.familyId, deletedAt: null } });
+  if (!existing) throw new Error("FAMILY_NOT_FOUND");
+  await db.$transaction([
+    db.family.update({ where: { id: existing.id }, data: { name: input.name, timezone: input.timezone } }),
+    db.auditLog.create({ data: { actorUserId: session.user.id, familyId: existing.id, action: "family.update", resourceType: "Family", resourceId: existing.id, metadata: { before: { name: existing.name, timezone: existing.timezone }, after: { name: input.name, timezone: input.timezone } } } })
+  ]);
+  revalidatePath("/family");
+}
+
 export async function createMember(formData: FormData) {
   const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED");
   const input = memberSchema.parse(Object.fromEntries(formData));
@@ -30,3 +43,60 @@ export async function createMember(formData: FormData) {
   });
   revalidatePath("/family");
 }
+
+export async function updateMember(formData: FormData) {
+  const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED");
+  const input = memberUpdateSchema.parse(Object.fromEntries(formData));
+  const context = await getAccessContext(session.user.id); if (!canManageFamily(context, input.familyId)) throw new Error("FORBIDDEN");
+  const existing = await db.familyMember.findFirst({
+    where: { id: input.memberId, familyId: input.familyId, deletedAt: null },
+    include: { learnerProfile: true }
+  });
+  if (!existing) throw new Error("MEMBER_NOT_FOUND");
+
+  const memberType = existing.memberType === "OWNER" ? "OWNER" : input.memberType;
+  await db.$transaction(async (tx) => {
+    await tx.familyMember.update({
+      where: { id: existing.id },
+      data: { displayName: input.displayName, nickname: input.nickname || null, memberType }
+    });
+    if (existing.learnerProfile && input.ageBand && input.dailyMinutes) {
+      await tx.learnerProfile.update({
+        where: { id: existing.learnerProfile.id },
+        data: { ageBand: input.ageBand, dailyMinutes: input.dailyMinutes }
+      });
+    }
+    await tx.auditLog.create({
+      data: {
+        actorUserId: session.user.id,
+        familyId: input.familyId,
+        action: "family-member.update",
+        resourceType: "FamilyMember",
+        resourceId: existing.id,
+        metadata: {
+          before: { displayName: existing.displayName, nickname: existing.nickname, memberType: existing.memberType, ageBand: existing.learnerProfile?.ageBand, dailyMinutes: existing.learnerProfile?.dailyMinutes },
+          after: { displayName: input.displayName, nickname: input.nickname || null, memberType, ageBand: input.ageBand, dailyMinutes: input.dailyMinutes }
+        }
+      }
+    });
+  });
+  revalidatePath("/family");
+}
+
+async function setMemberArchived(formData: FormData, archived: boolean) {
+  const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED");
+  const input = memberStateSchema.parse(Object.fromEntries(formData));
+  const context = await getAccessContext(session.user.id); if (!canManageFamily(context, input.familyId)) throw new Error("FORBIDDEN");
+  const existing = await db.familyMember.findFirst({ where: { id: input.memberId, familyId: input.familyId } });
+  if (!existing) throw new Error("MEMBER_NOT_FOUND");
+  if (existing.memberType === "OWNER") throw new Error("OWNER_CANNOT_BE_ARCHIVED");
+  const deletedAt = archived ? new Date() : null;
+  await db.$transaction([
+    db.familyMember.update({ where: { id: existing.id }, data: { deletedAt, status: archived ? "ARCHIVED" : "ACTIVE" } }),
+    db.auditLog.create({ data: { actorUserId: session.user.id, familyId: input.familyId, action: archived ? "family-member.archive" : "family-member.restore", resourceType: "FamilyMember", resourceId: existing.id } })
+  ]);
+  revalidatePath("/family");
+}
+
+export async function archiveMember(formData: FormData) { await setMemberArchived(formData, true); }
+export async function restoreMember(formData: FormData) { await setMemberArchived(formData, false); }

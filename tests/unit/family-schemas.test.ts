@@ -1,0 +1,24 @@
+import { describe, expect, it } from "vitest";
+import { memberUpdateSchema } from "@/modules/family/schemas";
+
+const base = {
+  familyId: "550e8400-e29b-41d4-a716-446655440000",
+  memberId: "550e8400-e29b-41d4-a716-446655440001",
+  displayName: "Alex",
+  nickname: "Al",
+  memberType: "LEARNER",
+  ageBand: "ADULT",
+  dailyMinutes: "30"
+};
+
+describe("memberUpdateSchema", () => {
+  it("normalizes editable member input", () => {
+    const parsed = memberUpdateSchema.parse(base);
+    expect(parsed.dailyMinutes).toBe(30);
+    expect(parsed.displayName).toBe("Alex");
+  });
+
+  it("rejects unsupported daily study time", () => {
+    expect(() => memberUpdateSchema.parse({ ...base, dailyMinutes: "5" })).toThrow();
+  });
+});
