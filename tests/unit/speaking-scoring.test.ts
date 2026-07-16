@@ -1,0 +1,2 @@
+import { describe, expect, it } from "vitest"; import { scoreSpeaking } from "@/modules/speaking/scoring";
+describe("speaking scoring", () => { it("scores matching keywords", () => { const result = scoreSpeaking("Could I have a glass of water", "Could I have a glass of water please"); expect(result.accuracy).toBe(1); }); it("does not award missing words", () => expect(scoreSpeaking("I would like coffee", "hello").accuracy).toBe(0)); });

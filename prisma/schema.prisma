@@ -260,6 +260,10 @@ model LearnerProfile {
   readingProgress    ReadingProgress[]
   dailyTasks         DailyTask[]
   activities         LearningActivity[]
+  grammarProgress    GrammarProgress[]
+  listeningProgress  ListeningProgress[]
+  speakingSessions   SpeakingSession[]
+  writingSubmissions WritingSubmission[]
 }
 
 model Role {
@@ -686,4 +690,192 @@ model LearningActivity {
 
   @@index([learnerProfileId, occurredAt])
   @@index([familyId, occurredAt])
+}
+
+model GrammarTopic {
+  id        String            @id @default(uuid()) @db.Uuid
+  slug      String            @unique
+  title     String
+  ruleEn    String            @db.Text
+  ruleZh    String            @db.Text
+  level     CefrLevel
+  status    ContentStatus     @default(PUBLISHED)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  examples  GrammarExample[]
+  exercises GrammarExercise[]
+  progress  GrammarProgress[]
+
+  @@index([level, status])
+}
+
+model GrammarExample {
+  id          String       @id @default(uuid()) @db.Uuid
+  topicId     String       @db.Uuid
+  sentence    String
+  translation String?
+  isError     Boolean      @default(false)
+  explanation String?
+  topic       GrammarTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}
+
+model GrammarExercise {
+  id          String           @id @default(uuid()) @db.Uuid
+  topicId     String           @db.Uuid
+  type        QuestionType
+  prompt      String
+  options     Json?
+  answerKey   String
+  explanation String?
+  order       Int
+  topic       GrammarTopic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  attempts    GrammarAttempt[]
+
+  @@unique([topicId, order])
+}
+
+model GrammarProgress {
+  id               String           @id @default(uuid()) @db.Uuid
+  learnerProfileId String           @db.Uuid
+  topicId          String           @db.Uuid
+  mastery          Float            @default(0)
+  correctCount     Int              @default(0)
+  incorrectCount   Int              @default(0)
+  lastPracticedAt  DateTime?
+  nextReviewAt     DateTime?
+  weaknessScore    Float            @default(1)
+  learnerProfile   LearnerProfile   @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  topic            GrammarTopic     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  attempts         GrammarAttempt[]
+
+  @@unique([learnerProfileId, topicId])
+  @@index([learnerProfileId, nextReviewAt])
+}
+
+model GrammarAttempt {
+  id         String          @id @default(uuid()) @db.Uuid
+  progressId String          @db.Uuid
+  exerciseId String          @db.Uuid
+  answer     String
+  isCorrect  Boolean
+  createdAt  DateTime        @default(now())
+  progress   GrammarProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+  exercise   GrammarExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+}
+
+model ListeningExercise {
+  id          String              @id @default(uuid()) @db.Uuid
+  title       String
+  level       CefrLevel
+  transcript  String              @db.Text
+  translation String?             @db.Text
+  audioUrl    String?
+  topic       String
+  status      ContentStatus       @default(PUBLISHED)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  questions   ListeningQuestion[]
+  progress    ListeningProgress[]
+
+  @@index([level, status])
+}
+
+model ListeningQuestion {
+  id          String            @id @default(uuid()) @db.Uuid
+  exerciseId  String            @db.Uuid
+  prompt      String
+  options     Json?
+  answerKey   String
+  explanation String?
+  order       Int
+  exercise    ListeningExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseId, order])
+}
+
+model ListeningProgress {
+  id               String            @id @default(uuid()) @db.Uuid
+  learnerProfileId String            @db.Uuid
+  exerciseId       String            @db.Uuid
+  attempts         Int               @default(0)
+  score            Float?
+  completedAt      DateTime?
+  learnerProfile   LearnerProfile    @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  exercise         ListeningExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([learnerProfileId, exerciseId])
+}
+
+model SpeakingSession {
+  id               String            @id @default(uuid()) @db.Uuid
+  learnerProfileId String            @db.Uuid
+  mode             String
+  prompt           String
+  startedAt        DateTime          @default(now())
+  endedAt          DateTime?
+  summary          String?
+  learnerProfile   LearnerProfile    @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  attempts         SpeakingAttempt[]
+
+  @@index([learnerProfileId, startedAt])
+}
+
+model SpeakingAttempt {
+  id                  String          @id @default(uuid()) @db.Uuid
+  sessionId           String          @db.Uuid
+  transcript          String
+  recognitionProvider String
+  durationSeconds     Int             @default(0)
+  retryNo             Int             @default(1)
+  fluencyScore        Float?
+  accuracyScore       Float?
+  feedback            String?         @db.Text
+  createdAt           DateTime        @default(now())
+  session             SpeakingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model WritingAssignment {
+  id          String              @id @default(uuid()) @db.Uuid
+  title       String
+  type        String
+  prompt      String              @db.Text
+  level       CefrLevel
+  targetWords Int
+  status      ContentStatus       @default(PUBLISHED)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  submissions WritingSubmission[]
+
+  @@index([level, status])
+}
+
+model WritingSubmission {
+  id                 String              @id @default(uuid()) @db.Uuid
+  assignmentId       String              @db.Uuid
+  learnerProfileId   String              @db.Uuid
+  version            Int                 @default(1)
+  parentSubmissionId String?             @db.Uuid
+  content            String              @db.Text
+  submittedAt        DateTime            @default(now())
+  status             String              @default("SUBMITTED")
+  assignment         WritingAssignment   @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  learnerProfile     LearnerProfile      @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  parentSubmission   WritingSubmission?  @relation("WritingVersions", fields: [parentSubmissionId], references: [id])
+  revisions          WritingSubmission[] @relation("WritingVersions")
+  feedback           WritingFeedback?
+
+  @@unique([assignmentId, learnerProfileId, version])
+}
+
+model WritingFeedback {
+  id               String            @id @default(uuid()) @db.Uuid
+  submissionId     String            @unique @db.Uuid
+  grammarScore     Float
+  vocabularyScore  Float
+  structureScore   Float
+  suggestions      String            @db.Text
+  rewrittenVersion String?           @db.Text
+  overallScore     Float
+  createdAt        DateTime          @default(now())
+  submission       WritingSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 }
