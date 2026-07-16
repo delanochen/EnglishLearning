@@ -1,0 +1,4 @@
+ALTER TABLE "GrammarTopic"
+ADD COLUMN "commonErrors" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN "useCases" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN "contrastExamples" JSONB;

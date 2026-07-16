@@ -961,6 +961,9 @@ model GrammarTopic {
   title     String
   ruleEn    String            @db.Text
   ruleZh    String            @db.Text
+  commonErrors String[]          @default([])
+  useCases     String[]          @default([])
+  contrastExamples Json?
   level     CefrLevel
   status    ContentStatus     @default(PUBLISHED)
   createdAt DateTime          @default(now())

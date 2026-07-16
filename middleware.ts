@@ -3,7 +3,7 @@ import { FixedWindowRateLimiter } from "@/lib/rate-limit";
 
 const limiter = new FixedWindowRateLimiter(120, 60_000);
 const uploadLimiter = new FixedWindowRateLimiter(20, 60_000);
-const protectedPrefixes = ["/dashboard", "/admin", "/family", "/learn", "/tasks", "/plans", "/reports", "/placement"];
+const protectedPrefixes = ["/dashboard", "/admin", "/family", "/learn", "/tasks", "/plans", "/reports", "/placement", "/notifications"];
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -19,4 +19,4 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/dashboard/:path*", "/admin/:path*", "/family/:path*", "/learn/:path*", "/tasks/:path*", "/plans/:path*", "/reports/:path*", "/placement/:path*", "/api/auth/:path*", "/api/uploads"] };
+export const config = { matcher: ["/dashboard/:path*", "/admin/:path*", "/family/:path*", "/learn/:path*", "/tasks/:path*", "/plans/:path*", "/reports/:path*", "/placement/:path*", "/notifications/:path*", "/api/auth/:path*", "/api/uploads"] };

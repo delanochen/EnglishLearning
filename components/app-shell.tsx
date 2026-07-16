@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Home, Users, ShieldCheck, LogOut, MessageCircle, BookOpen, ListChecks, Languages, BookCheck, Headphones, Mic, PencilLine, BarChart3, CalendarRange, FileChartColumn, Clapperboard, Gauge } from "lucide-react";
+import { Home, Users, ShieldCheck, LogOut, MessageCircle, BookOpen, ListChecks, Languages, BookCheck, Headphones, Mic, PencilLine, BarChart3, CalendarRange, FileChartColumn, Clapperboard, Gauge, Bell } from "lucide-react";
 import { Preferences } from "./preferences";
 import { logoutAction } from "@/modules/identity/actions";
 
@@ -20,6 +20,7 @@ export function AppShell({ children, userName, isAdmin }: { children: React.Reac
     { href: "/reports", label: "学习报告", icon: FileChartColumn },
     { href: "/family-dashboard", label: "家庭学习", icon: BarChart3 },
     { href: "/family", label: "家庭", icon: Users },
+    { href: "/notifications", label: "通知", icon: Bell },
     ...(isAdmin ? [{ href: "/admin", label: "管理", icon: ShieldCheck }] : [])
   ];
   return <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
