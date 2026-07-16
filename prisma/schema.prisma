@@ -534,24 +534,38 @@ model AIMessage {
 }
 
 model Vocabulary {
-  id           String                   @id @default(uuid()) @db.Uuid
-  word         String
-  phonetic     String?
-  partOfSpeech String?
-  definitionEn String
-  level        CefrLevel
-  topic        String
-  audioUrl     String?
-  imageUrl     String?
-  status       ContentStatus            @default(PUBLISHED)
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
-  meanings     VocabularyMeaning[]
-  examples     VocabularyExample[]
-  progress     UserVocabularyProgress[]
+  id            String                   @id @default(uuid()) @db.Uuid
+  word          String
+  phonetic      String?
+  partOfSpeech  String?
+  definitionEn  String
+  level         CefrLevel
+  topic         String
+  audioUrl      String?
+  imageUrl      String?
+  status        ContentStatus            @default(PUBLISHED)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  meanings      VocabularyMeaning[]
+  examples      VocabularyExample[]
+  progress      UserVocabularyProgress[]
+  relationsFrom VocabularyRelation[]     @relation("VocabularyRelationSource")
+  relationsTo   VocabularyRelation[]     @relation("VocabularyRelationTarget")
 
   @@unique([word, partOfSpeech])
   @@index([level, topic, status])
+}
+
+model VocabularyRelation {
+  id       String     @id @default(uuid()) @db.Uuid
+  sourceId String     @db.Uuid
+  targetId String     @db.Uuid
+  type     String
+  source   Vocabulary @relation("VocabularyRelationSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target   Vocabulary @relation("VocabularyRelationTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId, type])
+  @@index([sourceId, type])
 }
 
 model VocabularyMeaning {

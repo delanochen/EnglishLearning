@@ -34,7 +34,10 @@ async function main() {
     { word: "grocery", phonetic: "/ˈɡroʊsəri/", partOfSpeech: "noun", definitionEn: "food and household items sold in a store", definitionZh: "食品杂货", level: CefrLevel.A1, topic: "Daily life", sentence: "We need to buy some groceries after work.", translation: "我们下班后需要买些食品杂货。" },
     { word: "appointment", phonetic: "/əˈpɔɪntmənt/", partOfSpeech: "noun", definitionEn: "an arranged time to meet someone", definitionZh: "预约；约会", level: CefrLevel.A2, topic: "Daily life", sentence: "I have a doctor's appointment at three.", translation: "我三点预约了医生。" },
     { word: "improve", phonetic: "/ɪmˈpruːv/", partOfSpeech: "verb", definitionEn: "to become or make something better", definitionZh: "改善；提高", level: CefrLevel.A2, topic: "Learning", sentence: "Reading every day can improve your English.", translation: "每天阅读可以提高你的英语。" },
-    { word: "confident", phonetic: "/ˈkɑːnfɪdənt/", partOfSpeech: "adjective", definitionEn: "feeling sure about your abilities", definitionZh: "自信的", level: CefrLevel.B1, topic: "Growth", sentence: "She feels confident speaking in meetings.", translation: "她在会议上发言时感到自信。" }
+    { word: "confident", phonetic: "/ˈkɑːnfɪdənt/", partOfSpeech: "adjective", definitionEn: "feeling sure about your abilities", definitionZh: "自信的", level: CefrLevel.B1, topic: "Growth", sentence: "She feels confident speaking in meetings.", translation: "她在会议上发言时感到自信。" },
+    { word: "market", phonetic: "/ˈmɑːrkɪt/", partOfSpeech: "noun", definitionEn: "a place where people buy and sell goods", definitionZh: "市场", level: CefrLevel.A2, topic: "US life", sentence: "We buy fresh fruit at the market.", translation: "我们在市场买新鲜水果。" },
+    { word: "local", phonetic: "/ˈloʊkəl/", partOfSpeech: "adjective", definitionEn: "connected with a particular nearby area", definitionZh: "当地的", level: CefrLevel.A2, topic: "US life", sentence: "Local farmers sell fresh vegetables.", translation: "当地农户出售新鲜蔬菜。" },
+    { word: "cost", phonetic: "/kɔːst/", partOfSpeech: "verb", definitionEn: "to have a particular price", definitionZh: "价钱为；花费", level: CefrLevel.A2, topic: "Shopping", sentence: "How much do the strawberries cost?", translation: "这些草莓多少钱？" }
   ];
   for (const item of words) {
     const vocabulary = await db.vocabulary.upsert({
@@ -53,7 +56,12 @@ async function main() {
     translation: "星期六早上，米娅和爸爸去了农贸市场。市场很繁忙，但气氛友好。本地农户售卖新鲜的苹果、西红柿、面包和蜂蜜。米娅询问一位农户草莓多少钱。他说每盒四美元。米娅买了一盒并向他道谢。离开前，米娅和爸爸听了入口附近一位音乐家的演奏。他们计划下周末再来。",
     questions: [
       { order: 1, type: QuestionType.MULTIPLE_CHOICE, prompt: "When does Mia visit the market?", options: ["Saturday morning", "Sunday evening", "Monday afternoon"], answerKey: "Saturday morning", explanation: "The first sentence says Saturday morning." },
-      { order: 2, type: QuestionType.MULTIPLE_CHOICE, prompt: "How much are the strawberries?", options: ["Two dollars", "Four dollars", "Five dollars"], answerKey: "Four dollars", explanation: "The farmer says they are four dollars a box." }
+      { order: 2, type: QuestionType.MULTIPLE_CHOICE, prompt: "How much are the strawberries?", options: ["Two dollars", "Four dollars", "Five dollars"], answerKey: "Four dollars", explanation: "The farmer says they are four dollars a box." },
+      { order: 3, type: QuestionType.TRUE_FALSE, prompt: "Mia buys two boxes of strawberries.", options: ["True", "False"], answerKey: "False", explanation: "Mia buys one box." },
+      { order: 4, type: QuestionType.VOCABULARY, prompt: "Which word means ‘当地的’ in the article?", options: ["local", "busy", "fresh"], answerKey: "local", explanation: "Local means connected with the nearby area." },
+      { order: 5, type: QuestionType.SHORT_ANSWER, prompt: "Summarize the article in one English sentence.", answerKey: "Mia visits the farmers' market with her father.", explanation: "Mention Mia, her father, and the farmers' market." },
+      { order: 6, type: QuestionType.SHORT_ANSWER, prompt: "Oral retelling: type the key sentence you practiced saying aloud.", answerKey: "Mia visits the farmers' market.", explanation: "Retell the main event in your own words." },
+      { order: 7, type: QuestionType.SHORT_ANSWER, prompt: "Writing extension: What would you buy at a farmers' market and why?", answerKey: "I would buy fresh fruit.", explanation: "Write a complete sentence with a reason." }
     ]
   };
   let article = await db.readingArticle.findFirst({ where: { title: articleSeed.title, level: articleSeed.level } });
