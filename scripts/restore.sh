@@ -3,11 +3,16 @@ set -eu
 if [ "${CONFIRM_RESTORE:-}" != "yes" ]; then echo "Restore refused. Set CONFIRM_RESTORE=yes after stopping the app and verifying the target." >&2; exit 2; fi
 if [ "$#" -ne 1 ] || [ ! -d "$1" ]; then echo "Usage: CONFIRM_RESTORE=yes restore.sh /backups/homelingua-TIMESTAMP" >&2; exit 2; fi
 BACKUP="$1"
+case "$BACKUP" in /backups/homelingua-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z) ;; *) echo "Restore refused: backup must be a direct timestamped child of /backups." >&2; exit 2;; esac
 (cd "$BACKUP" && sha256sum -c checksums.sha256)
 export PGPASSWORD="$(cat /run/secrets/postgres_password)"
 dropdb --if-exists --force "$PGDATABASE"
 createdb "$PGDATABASE"
 pg_restore --no-owner --no-privileges --exit-on-error --dbname="$PGDATABASE" "$BACKUP/database.dump"
+psql --set=ON_ERROR_STOP=1 --set=resource="$BACKUP" <<'SQL'
+INSERT INTO "AuditLog" ("id", "action", "resourceType", "resourceId", "metadata", "createdAt")
+VALUES (gen_random_uuid(), 'BACKUP_RESTORED', 'Backup', :'resource', jsonb_build_object('source', 'operations-container'), now());
+SQL
 mkdir -p /restore/uploads
 tar -xzf "$BACKUP/uploads.tar.gz" -C /restore
 echo "Database restored. Copy /restore/uploads to the host uploads directory only after inspecting it. Keep the original settings_encryption_key secret."
