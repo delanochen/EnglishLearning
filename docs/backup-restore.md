@@ -15,6 +15,7 @@ docker compose --profile operations run --rm backup
 
 - `database.dump`：PostgreSQL custom-format dump；
 - `uploads.tar.gz`：上传文件归档；
+- `settings.dump`：系统设置和 AI 路由的独立配置快照（API Key 仍是密文）；
 - `manifest.txt`：应用版本、时间和数据库名；
 - `checksums.sha256`：上述文件的 SHA-256。
 
@@ -24,6 +25,19 @@ docker compose --profile operations run --rm backup
 cd backups/homelingua-时间戳
 sha256sum -c checksums.sha256
 ```
+
+管理员后台的“运维与备份”页可以逐项下载备份文件，也可以在输入完整备份名称后二次确认删除。手动创建仍由 NAS 运行隔离的 backup 容器，应用容器不会挂载危险的 Docker socket。
+
+## 定时备份
+
+在群晖“控制面板 → 任务计划 → 新增 → 计划的任务 → 用户定义的脚本”中，以 root 每天凌晨运行：
+
+```bash
+cd /volume2/docker/EnglishLearning
+/usr/local/bin/docker compose --profile operations run --rm backup >> logs/backup.log 2>&1
+```
+
+如果 Docker 实际路径不同，先执行 `command -v docker` 后替换。备份容器按照 `BACKUP_RETENTION_DAYS` 自动清理过期目录。
 
 ## 恢复演练
 
