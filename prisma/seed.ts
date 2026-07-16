@@ -83,6 +83,8 @@ async function main() {
   const scenarioQuestions = [{ order: 1, prompt: "Which milk does the customer request?", options: ["Whole milk", "Oat milk", "Soy milk"], answerKey: "Oat milk", explanation: "The customer asks for oat milk." }, { order: 2, prompt: "Is the order for here or to go?", options: ["For here", "To go"], answerKey: "To go", explanation: "The customer says 'To go, please.'" }];
   for (const row of scenarioQuestions) await db.scenarioExercise.upsert({ where: { lessonId_order: { lessonId: scenario.id, order: row.order } }, update: row, create: { lessonId: scenario.id, type: QuestionType.MULTIPLE_CHOICE, ...row } });
   await db.videoLesson.upsert({ where: { scenarioLessonId: scenario.id }, update: {}, create: { scenarioLessonId: scenario.id, title: "咖啡店点单图文时间线", durationSeconds: 150, timeline: [{ at: 0, title: "进入咖啡店", note: "先查看菜单和排队方式" }, { at: 30, title: "说明饮品", note: "杯型、饮品、奶类和温度" }, { at: 90, title: "确认方式", note: "For here or to go" }, { at: 125, title: "付款取餐", note: "听取名字或订单号" }] } });
+  const achievements = [{ code: "FIRST_TASK", name: "迈出第一步", description: "完成第一个学习任务", icon: "🌱", metric: "TASKS", threshold: 1 }, { code: "TEN_TASKS", name: "稳定前进", description: "累计完成 10 个学习任务", icon: "⭐", metric: "TASKS", threshold: 10 }, { code: "STREAK_7", name: "一周坚持", description: "连续学习 7 天", icon: "🔥", metric: "STREAK", threshold: 7 }, { code: "XP_500", name: "成长 500", description: "累计获得 500 XP", icon: "🏅", metric: "XP", threshold: 500 }];
+  for (const achievement of achievements) await db.achievement.upsert({ where: { code: achievement.code }, update: achievement, create: achievement });
 }
 
 main().finally(() => db.$disconnect());
