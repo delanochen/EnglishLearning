@@ -140,6 +140,24 @@ enum QuestionType {
   VOCABULARY
 }
 
+enum LearningPlanType {
+  WEEKLY
+  MONTHLY
+  STAGE
+}
+
+enum PlanStatus {
+  ACTIVE
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum PlanItemStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
 model User {
   id            String         @id @default(uuid()) @db.Uuid
   name          String?
@@ -207,6 +225,7 @@ model Family {
   timezone           String         @default("America/Chicago")
   locale             String         @default("zh-CN")
   leaderboardEnabled Boolean        @default(false)
+  sharedGoal         String?
   ownerUserId        String         @db.Uuid
   deletedAt          DateTime?
   createdAt          DateTime       @default(now())
@@ -264,6 +283,9 @@ model LearnerProfile {
   listeningProgress  ListeningProgress[]
   speakingSessions   SpeakingSession[]
   writingSubmissions WritingSubmission[]
+  learningPlans      LearningPlan[]
+  weeklyReports      WeeklyReport[]
+  monthlyReports     MonthlyReport[]
 }
 
 model Role {
@@ -640,24 +662,97 @@ model ReadingAnswer {
 }
 
 model DailyTask {
-  id               String           @id @default(uuid()) @db.Uuid
-  learnerProfileId String           @db.Uuid
-  taskDate         DateTime         @db.Date
+  id               String            @id @default(uuid()) @db.Uuid
+  learnerProfileId String            @db.Uuid
+  taskDate         DateTime          @db.Date
+  planItemId       String?           @db.Uuid
   taskType         DailyTaskType
   title            String
   description      String?
   contentRefType   String?
   contentRefId     String?
   estimatedMinutes Int
-  status           DailyTaskStatus  @default(PENDING)
-  xpReward         Int              @default(10)
+  status           DailyTaskStatus   @default(PENDING)
+  xpReward         Int               @default(10)
   generationReason String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  learnerProfile   LearnerProfile   @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  learnerProfile   LearnerProfile    @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
   completions      TaskCompletion[]
+  planItem         LearningPlanItem? @relation(fields: [planItemId], references: [id], onDelete: SetNull)
 
   @@index([learnerProfileId, taskDate, status])
+}
+
+model LearningPlan {
+  id               String             @id @default(uuid()) @db.Uuid
+  learnerProfileId String             @db.Uuid
+  type             LearningPlanType
+  periodStart      DateTime           @db.Date
+  periodEnd        DateTime           @db.Date
+  status           PlanStatus         @default(ACTIVE)
+  goals            String[]
+  generationSource String
+  adjustmentReason String?
+  version          Int                @default(1)
+  supersedesId     String?            @db.Uuid
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  learnerProfile   LearnerProfile     @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  supersedes       LearningPlan?      @relation("PlanVersions", fields: [supersedesId], references: [id])
+  revisions        LearningPlan[]     @relation("PlanVersions")
+  items            LearningPlanItem[]
+
+  @@unique([learnerProfileId, type, periodStart, version])
+  @@index([learnerProfileId, status, periodStart])
+}
+
+model LearningPlanItem {
+  id              String         @id @default(uuid()) @db.Uuid
+  planId          String         @db.Uuid
+  module          String
+  title           String
+  target          String
+  scheduledDate   DateTime       @db.Date
+  durationMinutes Int
+  priority        Int            @default(100)
+  status          PlanItemStatus @default(PENDING)
+  plan            LearningPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  dailyTasks      DailyTask[]
+
+  @@index([planId, scheduledDate, status])
+}
+
+model WeeklyReport {
+  id               String         @id @default(uuid()) @db.Uuid
+  learnerProfileId String         @db.Uuid
+  periodStart      DateTime       @db.Date
+  periodEnd        DateTime       @db.Date
+  metrics          Json
+  strengths        String[]
+  weakAreas        String[]
+  recommendations  String[]
+  generatedAt      DateTime       @default(now())
+  version          Int            @default(1)
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([learnerProfileId, periodStart, version])
+}
+
+model MonthlyReport {
+  id               String         @id @default(uuid()) @db.Uuid
+  learnerProfileId String         @db.Uuid
+  periodStart      DateTime       @db.Date
+  periodEnd        DateTime       @db.Date
+  metrics          Json
+  strengths        String[]
+  weakAreas        String[]
+  recommendations  String[]
+  generatedAt      DateTime       @default(now())
+  version          Int            @default(1)
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([learnerProfileId, periodStart, version])
 }
 
 model TaskCompletion {

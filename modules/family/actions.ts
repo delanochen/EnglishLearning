@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { getAccessContext } from "@/modules/authorization/context";
 import { canManageFamily } from "@/modules/authorization/policy";
 import { familySchema, familyUpdateSchema, memberSchema, memberStateSchema, memberUpdateSchema } from "./schemas";
+import { z } from "zod";
 
 export async function createFamily(formData: FormData) {
   const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED");
@@ -100,3 +101,11 @@ async function setMemberArchived(formData: FormData, archived: boolean) {
 
 export async function archiveMember(formData: FormData) { await setMemberArchived(formData, true); }
 export async function restoreMember(formData: FormData) { await setMemberArchived(formData, false); }
+
+export async function updateFamilyLearningSettings(formData: FormData) {
+  const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED");
+  const input = z.object({ familyId: z.string().uuid(), sharedGoal: z.string().trim().max(300).optional(), leaderboardEnabled: z.enum(["on"]).optional() }).parse(Object.fromEntries(formData));
+  const context = await getAccessContext(session.user.id); if (!canManageFamily(context, input.familyId)) throw new Error("FORBIDDEN");
+  await db.$transaction([db.family.update({ where: { id: input.familyId }, data: { sharedGoal: input.sharedGoal || null, leaderboardEnabled: input.leaderboardEnabled === "on" } }), db.auditLog.create({ data: { actorUserId: session.user.id, familyId: input.familyId, action: "family.learning-settings.update", resourceType: "Family", resourceId: input.familyId } })]);
+  revalidatePath("/family-dashboard"); revalidatePath("/family");
+}

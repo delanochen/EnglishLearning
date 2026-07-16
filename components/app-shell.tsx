@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Home, Users, ShieldCheck, LogOut, MessageCircle, BookOpen, ListChecks, Languages, BookCheck, Headphones, Mic, PencilLine } from "lucide-react";
+import { Home, Users, ShieldCheck, LogOut, MessageCircle, BookOpen, ListChecks, Languages, BookCheck, Headphones, Mic, PencilLine, BarChart3, CalendarRange, FileChartColumn } from "lucide-react";
 import { Preferences } from "./preferences";
 import { logoutAction } from "@/modules/identity/actions";
 
@@ -14,6 +14,9 @@ export function AppShell({ children, userName, isAdmin }: { children: React.Reac
     { href: "/learn/speaking", label: "口语", icon: Mic },
     { href: "/learn/writing", label: "写作", icon: PencilLine },
     { href: "/tasks", label: "每日任务", icon: ListChecks },
+    { href: "/plans", label: "学习计划", icon: CalendarRange },
+    { href: "/reports", label: "学习报告", icon: FileChartColumn },
+    { href: "/family-dashboard", label: "家庭学习", icon: BarChart3 },
     { href: "/family", label: "家庭", icon: Users },
     ...(isAdmin ? [{ href: "/admin", label: "管理", icon: ShieldCheck }] : [])
   ];
