@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FixedWindowRateLimiter } from "@/lib/rate-limit";
 
 const limiter = new FixedWindowRateLimiter(120, 60_000);
-const protectedPrefixes = ["/dashboard", "/admin", "/family", "/learn", "/tasks", "/plans", "/reports"];
+const protectedPrefixes = ["/dashboard", "/admin", "/family", "/learn", "/tasks", "/plans", "/reports", "/placement"];
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -18,4 +18,4 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/dashboard/:path*", "/admin/:path*", "/family/:path*", "/learn/:path*", "/tasks/:path*", "/plans/:path*", "/reports/:path*", "/api/auth/:path*"] };
+export const config = { matcher: ["/dashboard/:path*", "/admin/:path*", "/family/:path*", "/learn/:path*", "/tasks/:path*", "/plans/:path*", "/reports/:path*", "/placement/:path*", "/api/auth/:path*"] };

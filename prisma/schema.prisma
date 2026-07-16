@@ -164,6 +164,12 @@ enum ScenarioSourceType {
   ADAPTED
 }
 
+enum PlacementStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
 model User {
   id            String         @id @default(uuid()) @db.Uuid
   name          String?
@@ -293,6 +299,7 @@ model LearnerProfile {
   weeklyReports      WeeklyReport[]
   monthlyReports     MonthlyReport[]
   scenarioProgress   ScenarioProgress[]
+  placementTests     PlacementTest[]
 }
 
 model Role {
@@ -1059,4 +1066,42 @@ model WritingFeedback {
   overallScore     Float
   createdAt        DateTime          @default(now())
   submission       WritingSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
+
+model PlacementTest {
+  id               String                @id @default(uuid()) @db.Uuid
+  learnerProfileId String                @db.Uuid
+  version          Int
+  status           PlacementStatus       @default(IN_PROGRESS)
+  startedAt        DateTime              @default(now())
+  submittedAt      DateTime?
+  assessedLevel    CefrLevel?
+  sectionScores    Json?
+  strengths        String[]
+  weakAreas        String[]
+  recommendations  String[]
+  reportSnapshot   Json?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  learnerProfile   LearnerProfile        @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  answers          PlacementTestAnswer[]
+
+  @@unique([learnerProfileId, version])
+  @@index([learnerProfileId, submittedAt])
+}
+
+model PlacementTestAnswer {
+  id               String        @id @default(uuid()) @db.Uuid
+  testId           String        @db.Uuid
+  section          String
+  questionId       String
+  questionSnapshot String        @db.Text
+  answer           String        @db.Text
+  score            Float
+  maxScore         Float
+  feedback         String?
+  createdAt        DateTime      @default(now())
+  test             PlacementTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, questionId])
 }

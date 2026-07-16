@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Home, Users, ShieldCheck, LogOut, MessageCircle, BookOpen, ListChecks, Languages, BookCheck, Headphones, Mic, PencilLine, BarChart3, CalendarRange, FileChartColumn, Clapperboard } from "lucide-react";
+import { Home, Users, ShieldCheck, LogOut, MessageCircle, BookOpen, ListChecks, Languages, BookCheck, Headphones, Mic, PencilLine, BarChart3, CalendarRange, FileChartColumn, Clapperboard, Gauge } from "lucide-react";
 import { Preferences } from "./preferences";
 import { logoutAction } from "@/modules/identity/actions";
 
 export function AppShell({ children, userName, isAdmin }: { children: React.ReactNode; userName: string; isAdmin: boolean }) {
   const links = [
     { href: "/dashboard", label: "首页", icon: Home },
+    { href: "/placement", label: "水平测试", icon: Gauge },
     { href: "/learn/tutor", label: "AI 老师", icon: MessageCircle },
     { href: "/learn/vocabulary", label: "单词", icon: Languages },
     { href: "/learn/reading", label: "阅读", icon: BookOpen },
