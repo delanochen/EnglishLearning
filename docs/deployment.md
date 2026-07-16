@@ -1,5 +1,17 @@
 # Docker 与群晖部署说明
 
+## 一键升级与验收
+
+仓库已提供 `scripts/nas-deploy.sh`。它会检查 secrets、对正在运行的版本先做备份、拉取 main、构建启动，并等待 ready 健康检查；失败时会直接打印容器状态和最近日志。
+
+```bash
+cd /volume2/docker/EnglishLearning
+git config --global --add safe.directory /volume2/docker/EnglishLearning
+git pull --ff-only origin main
+chmod +x scripts/nas-deploy.sh
+./scripts/nas-deploy.sh
+```
+
 ## 持久化边界
 
 项目使用以下宿主目录：`data/postgres`、`uploads`、`logs`、`backups` 和 `secrets`。`settings_encryption_key` 必须单独离线保存；缺少原密钥将无法解密已有 AI Provider Key。
