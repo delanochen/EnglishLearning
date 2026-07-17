@@ -23,6 +23,20 @@ describe("NAS deployment scripts", () => {
     }
   });
 
+  it("backs up an empty or partially initialized database without matching-table or audit failures", () => {
+    const backup = readFileSync("scripts/backup.sh", "utf8");
+    expect(backup).toContain('CONFIG_TABLE_COUNT=');
+    expect(backup).toContain('--schema-only');
+    expect(backup).toContain('settings_snapshot=${SETTINGS_SNAPSHOT}');
+    expect(backup).toContain("to_regclass");
+    expect(backup).toContain("trap cleanup EXIT INT TERM");
+  });
+
+  it("updates deployment scripts before taking the pre-upgrade data backup", () => {
+    expect(deploy.indexOf("git pull --ff-only origin main")).toBeLessThan(deploy.indexOf("Creating pre-upgrade backup"));
+    expect(deploy.indexOf("docker compose config >/dev/null")).toBeLessThan(deploy.indexOf("Creating pre-upgrade backup"));
+  });
+
   it("hands root-created backups back to the non-root application user", () => {
     const backup = readFileSync("scripts/backup.sh", "utf8");
     expect(backup.indexOf('mv "$WORK" "$FINAL"')).toBeLessThan(backup.indexOf('chown -R 1001:1001 "$FINAL"'));

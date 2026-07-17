@@ -12,12 +12,12 @@ chmod 644 secrets/*
 mkdir -p data/postgres uploads logs backups backups/restore-staging
 chown 1001:1001 backups
 git config --global --add safe.directory "$PROJECT_DIR" >/dev/null 2>&1 || true
+git pull --ff-only origin main
+docker compose config >/dev/null
 if docker compose ps -q postgres 2>/dev/null | grep -q .; then
   echo "Creating pre-upgrade backup..."
   docker compose --profile operations run --rm backup
 fi
-git pull --ff-only origin main
-docker compose config >/dev/null
 docker compose build --pull app
 docker compose up -d
 attempt=0
