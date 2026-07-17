@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentEditSchema, csv, grammarPublishReadiness, listeningContentSchema, parseContrastLines, readingContentSchema, readingPublishReadiness, scenarioExerciseSchema, scenarioPublishReadiness } from "@/modules/admin/content-schemas";
+import { contentEditSchema, csv, grammarPublishReadiness, listeningContentSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingPublishReadiness, scenarioExerciseSchema, scenarioPublishReadiness } from "@/modules/admin/content-schemas";
 
 describe("admin content schemas", () => {
   it("normalizes target lists for manually authored reading lessons", () => {
@@ -9,6 +9,11 @@ describe("admin content schemas", () => {
 
   it("accepts listening drafts with an optional audio URL", () => {
     expect(listeningContentSchema.parse({ title: "At school", transcript: "Good morning. How can I help you today?", translation: "早上好。", level: "B1", topic: "school", audioUrl: "" }).audioUrl).toBe("");
+  });
+  it("requires a usable listening script and automatically scored questions", () => {
+    expect(listeningPublishReadiness({ questions: 1, transcript: "A short line." })).toHaveLength(2);
+    expect(listeningPublishReadiness({ questions: 3, transcript: "One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty." })).toEqual([]);
+    expect(listeningQuestionSchema.parse({ exerciseId: "11111111-1111-4111-8111-111111111111", prompt: "Where is she going?", options: "School\nWork", answerKey: "School" }).answerKey).toBe("School");
   });
 
   it("rejects invalid content edits", () => {

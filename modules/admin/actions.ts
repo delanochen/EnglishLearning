@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
-import { contentEditSchema, grammarExampleSchema, grammarExerciseSchema, grammarMetadataSchema, grammarPublishReadiness, listeningContentSchema, parseContrastLines, readingContentSchema, readingMetadataSchema, readingPublishReadiness, readingQuestionSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, csv, lines } from "./content-schemas";
+import { contentEditSchema, grammarExampleSchema, grammarExerciseSchema, grammarMetadataSchema, grammarPublishReadiness, listeningContentSchema, listeningMetadataSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingMetadataSchema, readingPublishReadiness, readingQuestionSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, csv, lines } from "./content-schemas";
 
 async function audit(actorUserId: string, action: string, resourceType: string, resourceId: string, metadata?: object) {
   await db.auditLog.create({ data: { actorUserId, action, resourceType, resourceId, metadata } });
@@ -50,7 +50,14 @@ export async function updateContentStatus(formData: FormData) {
     }
     await db.scenarioLesson.update({ where: { id: input.id }, data: { status: input.status } });
   }
-  if (input.type === "listening") await db.listeningExercise.update({ where: { id: input.id }, data: { status: input.status } });
+  if (input.type === "listening") {
+    if (input.status === "PUBLISHED") {
+      const exercise = await db.listeningExercise.findUniqueOrThrow({ where: { id: input.id }, include: { _count: { select: { questions: true } } } });
+      const missing = listeningPublishReadiness({ questions: exercise._count.questions, transcript: exercise.transcript });
+      if (missing.length) throw new Error(`LISTENING_NOT_READY:${missing.join("；")}`);
+    }
+    await db.listeningExercise.update({ where: { id: input.id }, data: { status: input.status } });
+  }
   await audit(actor.id, "CONTENT_STATUS_UPDATED", input.type, input.id, { status: input.status }); revalidatePath("/admin/content");
 }
 
@@ -174,5 +181,21 @@ export async function addReadingQuestion(formData: FormData) {
 export async function deleteReadingQuestion(formData: FormData) {
   const actor = await requireSystemAdmin(); const input = z.object({ articleId: z.string().uuid(), id: z.string().uuid() }).parse(Object.fromEntries(formData));
   await db.readingQuestion.deleteMany({ where: { id: input.id, articleId: input.articleId } }); await audit(actor.id, "READING_QUESTION_DELETED", "ReadingQuestion", input.id, { articleId: input.articleId }); revalidatePath(`/admin/content/reading/${input.articleId}`);
+}
+export async function updateListeningMetadata(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = listeningMetadataSchema.parse(Object.fromEntries(formData));
+  await db.listeningExercise.update({ where: { id: input.exerciseId }, data: { title: input.title, transcript: input.transcript, translation: input.translation || null, level: input.level, topic: input.topic, audioUrl: input.audioUrl || null } });
+  await audit(actor.id, "LISTENING_METADATA_UPDATED", "ListeningExercise", input.exerciseId); revalidatePath(`/admin/content/listening/${input.exerciseId}`); revalidatePath("/admin/content");
+}
+export async function addListeningQuestion(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = listeningQuestionSchema.parse(Object.fromEntries(formData)); const options = lines(input.options);
+  if (options.length < 2 || !options.includes(input.answerKey)) throw new Error("LISTENING_OPTIONS_INVALID");
+  const last = await db.listeningQuestion.aggregate({ where: { exerciseId: input.exerciseId }, _max: { order: true } });
+  const row = await db.listeningQuestion.create({ data: { exerciseId: input.exerciseId, order: (last._max.order ?? 0) + 1, prompt: input.prompt, options, answerKey: input.answerKey, explanation: input.explanation || null } });
+  await audit(actor.id, "LISTENING_QUESTION_ADDED", "ListeningQuestion", row.id, { exerciseId: input.exerciseId }); revalidatePath(`/admin/content/listening/${input.exerciseId}`);
+}
+export async function deleteListeningQuestion(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = z.object({ exerciseId: z.string().uuid(), id: z.string().uuid() }).parse(Object.fromEntries(formData));
+  await db.listeningQuestion.deleteMany({ where: { id: input.id, exerciseId: input.exerciseId } }); await audit(actor.id, "LISTENING_QUESTION_DELETED", "ListeningQuestion", input.id, { exerciseId: input.exerciseId }); revalidatePath(`/admin/content/listening/${input.exerciseId}`);
 }
 export async function archiveUploadedFile(formData:FormData){const actor=await requireSystemAdmin();const id=z.string().uuid().parse(formData.get("id"));await db.uploadedFile.update({where:{id},data:{status:"ARCHIVED",deletedAt:new Date()}});await audit(actor.id,"FILE_ARCHIVED","UploadedFile",id);revalidatePath("/admin/files")}
