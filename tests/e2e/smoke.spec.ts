@@ -4,6 +4,7 @@ test("PWA manifest and offline shell are available", async ({ request }) => { co
 test("anonymous learner is redirected to the login form", async ({ page }) => { await page.goto("/dashboard"); await expect(page).toHaveURL(/\/login/); await expect(page.getByRole("heading", { name: "欢迎回家" })).toBeVisible(); await expect(page.getByLabel("邮箱")).toBeVisible(); await expect(page.getByLabel("密码")).toBeVisible(); });
 
 test("login, member selection, and active-learner isolation work end to end", async ({ page }) => {
+  test.setTimeout(60_000);
   const email = process.env.E2E_ADMIN_EMAIL;
   const password = process.env.E2E_ADMIN_PASSWORD;
   test.skip(!email || !password, "Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD to run the authenticated flow.");

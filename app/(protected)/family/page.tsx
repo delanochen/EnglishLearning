@@ -37,7 +37,10 @@ export default async function FamilyPage({ searchParams }: { searchParams: Promi
     </form>}
 
     <div className="mt-8 space-y-6">{families.map((family) => {
-      const manageable = canManageFamily(ctx, family.id);
+      // Ownership is the source of truth. The role row is still used for
+      // delegated managers, but a temporarily missing/stale role assignment
+      // must never hide the owner's member-management controls.
+      const manageable = family.ownerUserId === session!.user.id || canManageFamily(ctx, family.id);
       return <section className="card" key={family.id}>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div><h2 className="text-2xl font-bold">{family.name}</h2><p className="text-sm text-muted">{family.timezone} · {family.members.filter((member) => !member.deletedAt).length} {t.members}</p></div>
