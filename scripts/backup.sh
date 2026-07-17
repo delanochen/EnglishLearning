@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+if [ "$(id -u)" = "0" ]; then chown 1001:1001 /backups; fi
 export PGPASSWORD="$(cat /run/secrets/postgres_password)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 FINAL="/backups/homelingua-${STAMP}"
@@ -7,7 +8,8 @@ WORK="${FINAL}.partial"
 mkdir -p "$WORK"
 pg_dump --format=custom --no-owner --no-privileges --file="$WORK/database.dump" "$PGDATABASE"
 pg_dump --format=custom --no-owner --no-privileges --table='SystemSetting' --table='AIProvider' --table='AIModel' --table='AIUsageRoute' --file="$WORK/settings.dump" "$PGDATABASE"
-tar -czf "$WORK/uploads.tar.gz" -C /source uploads
+SOURCE_ROOT="${BACKUP_SOURCE_ROOT:-/source}"
+tar -czf "$WORK/uploads.tar.gz" -C "$SOURCE_ROOT" uploads
 printf '%s\n' "version=${APP_VERSION:-unknown}" "created_at=${STAMP}" "database=${PGDATABASE}" > "$WORK/manifest.txt"
 (cd "$WORK" && sha256sum database.dump settings.dump uploads.tar.gz manifest.txt > checksums.sha256)
 mv "$WORK" "$FINAL"
