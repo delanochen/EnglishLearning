@@ -5,7 +5,7 @@ import { decryptSetting, encryptSetting, getSettingsEncryptionKey } from "@/lib/
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
 import { createProvider } from "./providers/factory";
 import { resolveProviderPreset } from "./provider-presets";
-import { idSchema, modelFormSchema, providerFormSchema, routeFormSchema } from "./schemas";
+import { idSchema, modelFormSchema, providerFormSchema, routeFormSchema, routeModelFormSchema } from "./schemas";
 
 export async function saveProvider(formData: FormData) {
   const user = await requireSystemAdmin();
@@ -38,6 +38,10 @@ export const addModel = saveModel;
 export async function removeModel(formData:FormData){const user=await requireSystemAdmin();const{id}=idSchema.parse(Object.fromEntries(formData));const model=await db.aIModel.findUniqueOrThrow({where:{id},include:{_count:{select:{requestLogs:true}}}});await db.$transaction(async tx=>{await tx.aIUsageRouteModel.deleteMany({where:{modelId:id}});if(model._count.requestLogs)await tx.aIModel.update({where:{id},data:{enabled:false,isDefault:false,status:"UNKNOWN",lastError:"ARCHIVED"}});else await tx.aIModel.delete({where:{id}});await tx.auditLog.create({data:{actorUserId:user.id,action:model._count.requestLogs?"ai-model.archive":"ai-model.delete",resourceType:"AIModel",resourceId:id}})});revalidatePath("/admin/ai")}
 
 export async function removeRouteModel(formData:FormData){const user=await requireSystemAdmin();const{id}=idSchema.parse(Object.fromEntries(formData));const row=await db.aIUsageRouteModel.findUniqueOrThrow({where:{id}});await db.$transaction([db.aIUsageRouteModel.delete({where:{id}}),db.auditLog.create({data:{actorUserId:user.id,action:"ai-route-model.remove",resourceType:"AIUsageRoute",resourceId:row.routeId,metadata:{modelId:row.modelId}}})]);revalidatePath("/admin/ai")}
+
+export async function updateRouteModel(formData:FormData){const user=await requireSystemAdmin();const input=routeModelFormSchema.parse(Object.fromEntries(formData));const row=await db.aIUsageRouteModel.update({where:{id:input.id},data:{priority:input.priority,enabled:input.enabled==="on"}});await db.auditLog.create({data:{actorUserId:user.id,action:"ai-route-model.update",resourceType:"AIUsageRoute",resourceId:row.routeId,metadata:{modelId:row.modelId,priority:row.priority,enabled:row.enabled}}});revalidatePath("/admin/ai")}
+
+export async function toggleRoute(formData:FormData){const user=await requireSystemAdmin();const{id}=idSchema.parse(Object.fromEntries(formData));const route=await db.aIUsageRoute.findUniqueOrThrow({where:{id}});await db.aIUsageRoute.update({where:{id},data:{enabled:!route.enabled}});await db.auditLog.create({data:{actorUserId:user.id,action:route.enabled?"ai-route.disable":"ai-route.enable",resourceType:"AIUsageRoute",resourceId:id}});revalidatePath("/admin/ai")}
 
 export async function toggleProvider(formData: FormData) {
   const user = await requireSystemAdmin(); const { id } = idSchema.parse(Object.fromEntries(formData));

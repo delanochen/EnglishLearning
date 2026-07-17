@@ -24,3 +24,4 @@ export const routeFormSchema = z.object({
   purpose: z.enum(["TUTOR", "VOCABULARY", "READING", "QUIZ", "GRAMMAR", "WRITING", "LEARNING_PLAN", "TRANSLATION", "SPEECH_RECOGNITION", "TTS", "IMAGE_GENERATION", "VIDEO_GENERATION"]),
   modelId: z.string().uuid(), priority: z.coerce.number().int().min(1).max(10000)
 });
+export const routeModelFormSchema = z.object({ id: z.string().uuid(), priority: z.coerce.number().int().min(1).max(10000), enabled: z.string().optional() });

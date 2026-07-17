@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modelFormSchema, providerFormSchema } from "@/modules/ai/schemas";
+import { modelFormSchema, providerFormSchema, routeModelFormSchema } from "@/modules/ai/schemas";
 import { resolveProviderPreset } from "@/modules/ai/provider-presets";
 
 const providerId = "11111111-1111-4111-8111-111111111111";
@@ -23,6 +23,10 @@ describe("AI model form schema", () => {
       priority: 10,
       capabilities: "chat,structured-output"
     });
+  });
+  it("validates editable fallback route priority and state",()=>{
+    expect(routeModelFormSchema.parse({id:"11111111-1111-4111-8111-111111111111",priority:"20",enabled:"on"})).toMatchObject({priority:20,enabled:"on"});
+    expect(()=>routeModelFormSchema.parse({id:"bad",priority:0})).toThrow();
   });
 
   it("accepts lifecycle fields when editing a model", () => {
