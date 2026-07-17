@@ -7,7 +7,13 @@ FINAL="/backups/homelingua-${STAMP}"
 WORK="${FINAL}.partial"
 mkdir -p "$WORK"
 pg_dump --format=custom --no-owner --no-privileges --file="$WORK/database.dump" "$PGDATABASE"
-pg_dump --format=custom --no-owner --no-privileges --table='SystemSetting' --table='AIProvider' --table='AIModel' --table='AIUsageRoute' --file="$WORK/settings.dump" "$PGDATABASE"
+pg_dump --format=custom --no-owner --no-privileges \
+  --table='public."SystemSetting"' \
+  --table='public."AIProvider"' \
+  --table='public."AIModel"' \
+  --table='public."AIUsageRoute"' \
+  --table='public."AIUsageRouteModel"' \
+  --file="$WORK/settings.dump" "$PGDATABASE"
 SOURCE_ROOT="${BACKUP_SOURCE_ROOT:-/source}"
 tar -czf "$WORK/uploads.tar.gz" -C "$SOURCE_ROOT" uploads
 printf '%s\n' "version=${APP_VERSION:-unknown}" "created_at=${STAMP}" "database=${PGDATABASE}" > "$WORK/manifest.txt"

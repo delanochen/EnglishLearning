@@ -15,6 +15,13 @@ describe("NAS deployment scripts", () => {
     expect(deploy.indexOf("mkdir -p data/postgres uploads logs backups backups/restore-staging")).toBeLessThan(deploy.indexOf("docker compose --profile operations run --rm backup"));
   });
 
+  it("quotes Prisma configuration table names in the settings snapshot", () => {
+    const backup = readFileSync("scripts/backup.sh", "utf8");
+    for (const table of ["SystemSetting", "AIProvider", "AIModel", "AIUsageRoute", "AIUsageRouteModel"]) {
+      expect(backup).toContain(`--table='public.\"${table}\"'`);
+    }
+  });
+
   it("requires explicit confirmation and a direct timestamped backup path", () => {
     expect(restore).toContain('CONFIRM_RESTORE:-');
     expect(restore).toContain("/backups/homelingua-[0-9]");
