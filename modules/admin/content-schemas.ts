@@ -57,6 +57,9 @@ export const readingMetadataSchema = z.object({ articleId: z.string().uuid(), ti
 export const readingQuestionSchema = z.object({ articleId: z.string().uuid(), type: z.enum(["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "VOCABULARY"]), prompt: z.string().trim().min(2).max(2000), options: z.string().max(5000), answerKey: z.string().trim().min(1).max(2000), explanation: z.string().trim().max(2000).optional() });
 export const listeningMetadataSchema = listeningContentSchema.extend({ exerciseId: z.string().uuid() });
 export const listeningQuestionSchema = z.object({ exerciseId: z.string().uuid(), prompt: z.string().trim().min(2).max(2000), options: z.string().max(5000), answerKey: z.string().trim().min(1).max(1000), explanation: z.string().trim().max(2000).optional() });
+export const vocabularyMetadataSchema = z.object({ vocabularyId: z.string().uuid(), word: z.string().trim().min(1).max(80), phonetic: z.string().trim().max(80).optional(), partOfSpeech: z.string().trim().min(1).max(40), definitionEn: z.string().trim().min(2).max(1000), definitionZh: z.string().trim().min(1).max(1000), level: cefrSchema, topic: z.string().trim().min(1).max(100), audioUrl: z.string().trim().url().max(1000).optional().or(z.literal("")), imageUrl: z.string().trim().url().max(1000).optional().or(z.literal("")) });
+export const vocabularyExampleSchema = z.object({ vocabularyId: z.string().uuid(), sentence: z.string().trim().min(2).max(2000), translation: z.string().trim().max(2000).optional(), collocations: z.string().max(2000), difficulty: cefrSchema });
+export const vocabularyRelationSchema = z.object({ vocabularyId: z.string().uuid(), targetWord: z.string().trim().min(1).max(80), type: z.enum(["SYNONYM", "ANTONYM"]) });
 
 export function lines(value = "") { return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
 export function parseContrastLines(value = "") { return lines(value).map((line) => { const [correct = "", incorrect = "", note = ""] = line.split("|").map((item) => item.trim()); return { correct, incorrect, note }; }).filter((item) => item.correct && item.incorrect); }
@@ -90,6 +93,12 @@ export function listeningPublishReadiness(input: { questions: number; transcript
   const missing: string[] = [];
   if (input.transcript.trim().split(/\s+/).length < 20) missing.push("至少 20 个英文单词的听力稿");
   if (input.questions < 3) missing.push("至少 3 道自动判分题");
+  return missing;
+}
+export function vocabularyPublishReadiness(input: { meanings: number; examples: number }) {
+  const missing: string[] = [];
+  if (input.meanings < 1) missing.push("至少 1 条中文释义");
+  if (input.examples < 1) missing.push("至少 1 个情境例句");
   return missing;
 }
 

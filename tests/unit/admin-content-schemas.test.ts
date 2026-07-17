@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentEditSchema, csv, grammarPublishReadiness, listeningContentSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingPublishReadiness, scenarioExerciseSchema, scenarioPublishReadiness } from "@/modules/admin/content-schemas";
+import { contentEditSchema, csv, grammarPublishReadiness, listeningContentSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingPublishReadiness, scenarioExerciseSchema, scenarioPublishReadiness, vocabularyPublishReadiness } from "@/modules/admin/content-schemas";
 
 describe("admin content schemas", () => {
   it("normalizes target lists for manually authored reading lessons", () => {
@@ -14,6 +14,10 @@ describe("admin content schemas", () => {
     expect(listeningPublishReadiness({ questions: 1, transcript: "A short line." })).toHaveLength(2);
     expect(listeningPublishReadiness({ questions: 3, transcript: "One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty." })).toEqual([]);
     expect(listeningQuestionSchema.parse({ exerciseId: "11111111-1111-4111-8111-111111111111", prompt: "Where is she going?", options: "School\nWork", answerKey: "School" }).answerKey).toBe("School");
+  });
+  it("blocks incomplete vocabulary entries from publication", () => {
+    expect(vocabularyPublishReadiness({ meanings: 0, examples: 0 })).toHaveLength(2);
+    expect(vocabularyPublishReadiness({ meanings: 1, examples: 1 })).toEqual([]);
   });
 
   it("rejects invalid content edits", () => {

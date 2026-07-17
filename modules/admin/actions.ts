@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
-import { contentEditSchema, grammarExampleSchema, grammarExerciseSchema, grammarMetadataSchema, grammarPublishReadiness, listeningContentSchema, listeningMetadataSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingMetadataSchema, readingPublishReadiness, readingQuestionSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, csv, lines } from "./content-schemas";
+import { contentEditSchema, grammarExampleSchema, grammarExerciseSchema, grammarMetadataSchema, grammarPublishReadiness, listeningContentSchema, listeningMetadataSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingMetadataSchema, readingPublishReadiness, readingQuestionSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, vocabularyExampleSchema, vocabularyMetadataSchema, vocabularyPublishReadiness, vocabularyRelationSchema, csv, lines } from "./content-schemas";
 
 async function audit(actorUserId: string, action: string, resourceType: string, resourceId: string, metadata?: object) {
   await db.auditLog.create({ data: { actorUserId, action, resourceType, resourceId, metadata } });
@@ -25,7 +25,13 @@ export async function updateUserStatus(formData: FormData) {
 const contentInput = z.object({ type: z.enum(["vocabulary", "reading", "grammar", "scenario", "listening"]), id: z.string().uuid(), status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]) });
 export async function updateContentStatus(formData: FormData) {
   const actor = await requireSystemAdmin(); const input = contentInput.parse(Object.fromEntries(formData));
-  if (input.type === "vocabulary") await db.vocabulary.update({ where: { id: input.id }, data: { status: input.status } });
+  if (input.type === "vocabulary") {
+    if (input.status === "PUBLISHED") {
+      const word = await db.vocabulary.findUniqueOrThrow({ where: { id: input.id }, include: { _count: { select: { meanings: true, examples: true } } } });
+      const missing = vocabularyPublishReadiness(word._count); if (missing.length) throw new Error(`VOCABULARY_NOT_READY:${missing.join("；")}`);
+    }
+    await db.vocabulary.update({ where: { id: input.id }, data: { status: input.status } });
+  }
   if (input.type === "reading") {
     if (input.status === "PUBLISHED") {
       const article = await db.readingArticle.findUniqueOrThrow({ where: { id: input.id }, include: { _count: { select: { questions: true } } } });
@@ -197,5 +203,24 @@ export async function addListeningQuestion(formData: FormData) {
 export async function deleteListeningQuestion(formData: FormData) {
   const actor = await requireSystemAdmin(); const input = z.object({ exerciseId: z.string().uuid(), id: z.string().uuid() }).parse(Object.fromEntries(formData));
   await db.listeningQuestion.deleteMany({ where: { id: input.id, exerciseId: input.exerciseId } }); await audit(actor.id, "LISTENING_QUESTION_DELETED", "ListeningQuestion", input.id, { exerciseId: input.exerciseId }); revalidatePath(`/admin/content/listening/${input.exerciseId}`);
+}
+export async function updateVocabularyMetadata(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = vocabularyMetadataSchema.parse(Object.fromEntries(formData));
+  await db.$transaction(async tx => { await tx.vocabulary.update({ where: { id: input.vocabularyId }, data: { word: input.word, phonetic: input.phonetic || null, partOfSpeech: input.partOfSpeech, definitionEn: input.definitionEn, level: input.level, topic: input.topic, audioUrl: input.audioUrl || null, imageUrl: input.imageUrl || null } }); await tx.vocabularyMeaning.upsert({ where: { vocabularyId_locale_senseOrder: { vocabularyId: input.vocabularyId, locale: "zh-CN", senseOrder: 1 } }, update: { definition: input.definitionZh }, create: { vocabularyId: input.vocabularyId, locale: "zh-CN", senseOrder: 1, definition: input.definitionZh } }); });
+  await audit(actor.id, "VOCABULARY_METADATA_UPDATED", "Vocabulary", input.vocabularyId); revalidatePath(`/admin/content/vocabulary/${input.vocabularyId}`); revalidatePath("/admin/content");
+}
+export async function addVocabularyExample(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = vocabularyExampleSchema.parse(Object.fromEntries(formData)); const row = await db.vocabularyExample.create({ data: { vocabularyId: input.vocabularyId, sentence: input.sentence, translation: input.translation || null, collocations: csv(input.collocations), difficulty: input.difficulty } });
+  await audit(actor.id, "VOCABULARY_EXAMPLE_ADDED", "VocabularyExample", row.id, { vocabularyId: input.vocabularyId }); revalidatePath(`/admin/content/vocabulary/${input.vocabularyId}`);
+}
+export async function deleteVocabularyExample(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = z.object({ vocabularyId: z.string().uuid(), id: z.string().uuid() }).parse(Object.fromEntries(formData)); await db.vocabularyExample.deleteMany({ where: { id: input.id, vocabularyId: input.vocabularyId } }); await audit(actor.id, "VOCABULARY_EXAMPLE_DELETED", "VocabularyExample", input.id); revalidatePath(`/admin/content/vocabulary/${input.vocabularyId}`);
+}
+export async function addVocabularyRelation(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = vocabularyRelationSchema.parse(Object.fromEntries(formData)); const target = await db.vocabulary.findFirst({ where: { word: { equals: input.targetWord, mode: "insensitive" }, NOT: { id: input.vocabularyId } }, orderBy: { updatedAt: "desc" } }); if (!target) throw new Error("VOCABULARY_RELATION_TARGET_NOT_FOUND");
+  const row = await db.vocabularyRelation.upsert({ where: { sourceId_targetId_type: { sourceId: input.vocabularyId, targetId: target.id, type: input.type } }, update: {}, create: { sourceId: input.vocabularyId, targetId: target.id, type: input.type } }); await audit(actor.id, "VOCABULARY_RELATION_ADDED", "VocabularyRelation", row.id); revalidatePath(`/admin/content/vocabulary/${input.vocabularyId}`);
+}
+export async function deleteVocabularyRelation(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = z.object({ vocabularyId: z.string().uuid(), id: z.string().uuid() }).parse(Object.fromEntries(formData)); await db.vocabularyRelation.deleteMany({ where: { id: input.id, sourceId: input.vocabularyId } }); await audit(actor.id, "VOCABULARY_RELATION_DELETED", "VocabularyRelation", input.id); revalidatePath(`/admin/content/vocabulary/${input.vocabularyId}`);
 }
 export async function archiveUploadedFile(formData:FormData){const actor=await requireSystemAdmin();const id=z.string().uuid().parse(formData.get("id"));await db.uploadedFile.update({where:{id},data:{status:"ARCHIVED",deletedAt:new Date()}});await audit(actor.id,"FILE_ARCHIVED","UploadedFile",id);revalidatePath("/admin/files")}
