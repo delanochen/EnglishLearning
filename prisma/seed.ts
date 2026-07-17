@@ -1,5 +1,6 @@
 import { CefrLevel, PrismaClient, QuestionType, RoleScope } from "@prisma/client";
 import { uniqueScenarioVocabulary } from "../modules/scenario/vocabulary";
+import { achievementCatalog } from "../modules/achievements/catalog";
 
 const db = new PrismaClient();
 const permissions = [
@@ -178,8 +179,7 @@ async function main() {
     const scenarioWords = uniqueScenarioVocabulary(item.words, [["follow-up","后续追问"],["confirmation","确认信息"],["next step","下一步"]]);
     await db.scenarioVocabulary.createMany({data:scenarioWords.map(([word,meaningZh],index)=>({lessonId:lesson.id,word,meaningZh,example:index<3?[item.need,item.question,item.solution][index]:`Could you confirm the ${word}?`,order:index+1}))});
   }
-  const achievements = [{ code: "FIRST_TASK", name: "迈出第一步", description: "完成第一个学习任务", icon: "🌱", metric: "TASKS", threshold: 1 }, { code: "TEN_TASKS", name: "稳定前进", description: "累计完成 10 个学习任务", icon: "⭐", metric: "TASKS", threshold: 10 }, { code: "STREAK_7", name: "一周坚持", description: "连续学习 7 天", icon: "🔥", metric: "STREAK", threshold: 7 }, { code: "XP_500", name: "成长 500", description: "累计获得 500 XP", icon: "🏅", metric: "XP", threshold: 500 }];
-  for (const achievement of achievements) await db.achievement.upsert({ where: { code: achievement.code }, update: achievement, create: achievement });
+  for (const achievement of achievementCatalog) await db.achievement.upsert({ where: { code: achievement.code }, update: achievement, create: achievement });
 }
 
 main().finally(() => db.$disconnect());
