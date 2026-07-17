@@ -6,6 +6,7 @@ import { FixedWindowRateLimiter } from "@/lib/rate-limit";
 import { createProvider } from "./providers/factory";
 import { ProviderHttpError } from "./providers/base";
 import type { ChatInput, ChatResponse, StructuredInput } from "./types";
+import { canFallback, retryDelayMs, shouldRetrySameModel } from "./retry-policy";
 
 type Candidate = Awaited<ReturnType<typeof loadCandidates>>[number];
 const userLimiter = new FixedWindowRateLimiter(30, 60_000);
@@ -31,8 +32,6 @@ function classifyError(error: unknown) {
   return "UNKNOWN";
 }
 
-function canFallback(errorType: string) { return ["RATE_LIMIT", "PROVIDER_5XX", "TIMEOUT", "UNKNOWN", "AI_EMPTY_RESPONSE", "AI_INVALID_JSON"].includes(errorType); }
-
 async function instantiate(candidate: Candidate) {
   const provider = candidate.model.provider;
   const apiKey = provider.encryptedApiKey && provider.apiKeyIv && provider.apiKeyAuthTag
@@ -44,18 +43,28 @@ export async function routedChat(purpose: AIUsagePurpose, input: Omit<ChatInput,
   if (userId && !userLimiter.check(`${userId}:${purpose}`).allowed) throw new Error("AI_USER_RATE_LIMIT");
   const candidates = await loadCandidates(purpose);
   if (!candidates.length) throw new Error(`AI_ROUTE_NOT_CONFIGURED:${purpose}`);
-  const requestId = randomUUID(); let fallbackFromId: string | undefined;
+  const requestId = randomUUID(); let fallbackFromId: string | undefined; let attemptNo = 0;
   for (let index = 0; index < candidates.length; index++) {
-    const candidate = candidates[index]; const started = Date.now();
-    try {
-      const response = await (await instantiate(candidate)).chat({ ...input, model: candidate.model.name, temperature: input.temperature ?? candidate.model.temperature, maxTokens: input.maxTokens ?? candidate.model.maxTokens });
-      await db.aIRequestLog.create({ data: { requestId, providerId: candidate.model.provider.id, modelId: candidate.model.id, purpose, userId, status: "SUCCESS", latencyMs: Date.now() - started, inputTokens: response.inputTokens, outputTokens: response.outputTokens, attemptNo: index + 1, fallbackFromId } });
-      return response;
-    } catch (error) {
-      const errorType = classifyError(error);
-      await db.aIRequestLog.create({ data: { requestId, providerId: candidate.model.provider.id, modelId: candidate.model.id, purpose, userId, status: "FAILED", latencyMs: Date.now() - started, errorType, errorMessage: errorType, attemptNo: index + 1, fallbackFromId } });
-      if (!canFallback(errorType) || index === candidates.length - 1) throw error;
-      fallbackFromId = candidate.model.id;
+    const candidate = candidates[index]; let retryCount = 0;
+    while (true) {
+      const started = Date.now(); attemptNo++;
+      try {
+        const response = await (await instantiate(candidate)).chat({ ...input, model: candidate.model.name, temperature: input.temperature ?? candidate.model.temperature, maxTokens: input.maxTokens ?? candidate.model.maxTokens });
+        await db.aIRequestLog.create({ data: { requestId, providerId: candidate.model.provider.id, modelId: candidate.model.id, purpose, userId, status: "SUCCESS", latencyMs: Date.now() - started, inputTokens: response.inputTokens, outputTokens: response.outputTokens, attemptNo, fallbackFromId } });
+        return response;
+      } catch (error) {
+        const errorType = classifyError(error);
+        await db.aIRequestLog.create({ data: { requestId, providerId: candidate.model.provider.id, modelId: candidate.model.id, purpose, userId, status: "FAILED", latencyMs: Date.now() - started, errorType, errorMessage: errorType, attemptNo, fallbackFromId } });
+        if (!canFallback(errorType)) throw error;
+        if (shouldRetrySameModel(errorType, retryCount)) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs(retryCount)));
+          retryCount++;
+          continue;
+        }
+        if (index === candidates.length - 1) throw error;
+        fallbackFromId = candidate.model.id;
+        break;
+      }
     }
   }
   throw new Error("AI_ALL_PROVIDERS_FAILED");
