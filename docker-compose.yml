@@ -94,7 +94,11 @@ services:
     volumes:
       - ./uploads:/source/uploads:ro
       - ./backups:/backups
-      - ./backups/restore-staging:/restore
+      - type: bind
+        source: ./backups/restore-staging
+        target: /restore
+        bind:
+          create_host_path: true
       - ./scripts:/scripts:ro
     entrypoint: ["/bin/sh", "/scripts/backup.sh"]
     networks: [internal]

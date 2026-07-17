@@ -8,7 +8,7 @@ for file in postgres_password auth_secret settings_encryption_key initial_admin_
 done
 chmod 700 secrets
 chmod 644 secrets/*
-mkdir -p data/postgres uploads logs backups
+mkdir -p data/postgres uploads logs backups backups/restore-staging
 git config --global --add safe.directory "$PROJECT_DIR" >/dev/null 2>&1 || true
 if docker compose ps -q postgres 2>/dev/null | grep -q .; then
   echo "Creating pre-upgrade backup..."

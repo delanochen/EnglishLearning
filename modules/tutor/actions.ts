@@ -2,10 +2,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { routedChat } from "@/modules/ai/gateway";
 import { requireProfileAccess } from "@/modules/learner/access";
+import { buildTutorSystemPrompt } from "./prompt";
 
 const createSchema = z.object({ profileId: z.string().uuid(), topic: z.string().trim().min(2).max(120), teacherStyle: z.enum(["GENTLE", "STRICT", "CHILD", "ACADEMIC", "US_LIFE", "WORKPLACE"]) });
 const messageSchema = z.object({ conversationId: z.string().uuid(), content: z.string().trim().min(1).max(4000) });
@@ -28,9 +30,10 @@ export async function sendTutorMessage(formData: FormData) {
   await db.aIMessage.create({ data: { conversationId: conversation.id, role: "user", content: input.content, sequence: nextSequence } });
   const style = { GENTLE: "gentle and encouraging", STRICT: "strict and correction-focused", CHILD: "child-friendly", ACADEMIC: "US high-school academic", US_LIFE: "practical US life English", WORKPLACE: "professional workplace English" }[conversation.teacherStyle];
   const level = conversation.learnerProfile.cefrLevel?.replace("_", "-") ?? "A1";
+  const immersion = (await cookies()).get("ui_locale")?.value === "en";
   let text: string; let inputTokens: number | undefined; let outputTokens: number | undefined;
   try {
-    const response = await routedChat("TUTOR", { messages: [{ role: "system", content: `You are a ${style} English teacher. Learner level: ${level}. Correct errors clearly. Use Chinese support for PRE-A1/A1/A2 and less Chinese for B1+. Topic: ${conversation.topic}.` }, ...conversation.messages.map((message) => ({ role: message.role as "user" | "assistant", content: message.content })), { role: "user", content: input.content }] }, session.user.id);
+    const response = await routedChat("TUTOR", { messages: [{ role: "system", content: buildTutorSystemPrompt(style, level, conversation.topic, immersion) }, ...conversation.messages.map((message) => ({ role: message.role as "user" | "assistant", content: message.content })), { role: "user", content: input.content }] }, session.user.id);
     text = response.text; inputTokens = response.inputTokens; outputTokens = response.outputTokens;
   } catch { text = "AI 老师暂时不可用。请让系统管理员在“管理后台 → AI 模型管理”中配置并测试 TUTOR 用途路由。"; }
   await db.$transaction([
