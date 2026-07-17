@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { maskApiKey } from "@/lib/settings-crypto";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
 import { addModel, deleteProvider, saveProvider, saveRoute, testProvider, testProviderGeneration, toggleProvider } from "@/modules/ai/admin-actions";
+import { summarizeAIUsage } from "@/modules/ai/usage-stats";
 
 const purposeLabels: Record<AIUsagePurpose, string> = {
   TUTOR: "AI 英语老师", VOCABULARY: "单词解释", READING: "阅读生成", QUIZ: "出题", GRAMMAR: "语法批改", WRITING: "写作批改",
@@ -11,11 +12,14 @@ const purposeLabels: Record<AIUsagePurpose, string> = {
 
 export default async function AIAdminPage() {
   await requireSystemAdmin();
-  const [providers, routes] = await Promise.all([
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+  const [providers, routes, requestLogs] = await Promise.all([
     db.aIProvider.findMany({ where: { deletedAt: null }, include: { models: { orderBy: { priority: "asc" } } }, orderBy: { priority: "asc" } }),
-    db.aIUsageRoute.findMany({ include: { models: { include: { model: { include: { provider: true } } }, orderBy: { priority: "asc" } } } })
+    db.aIUsageRoute.findMany({ include: { models: { include: { model: { include: { provider: true } } }, orderBy: { priority: "asc" } } } }),
+    db.aIRequestLog.findMany({ where: { createdAt: { gte: sevenDaysAgo } }, include: { provider: { select: { name: true } } }, orderBy: { createdAt: "desc" }, take: 5000 })
   ]);
   const models = providers.flatMap((provider) => provider.models.map((model) => ({ ...model, providerName: provider.name })));
+  const usage = summarizeAIUsage(requestLogs);
 
   return <div className="mx-auto max-w-6xl">
     <p className="text-sm font-bold uppercase tracking-[.2em] text-brand">AI Platform</p><h1 className="mt-2 text-4xl font-black">AI 模型管理</h1>
@@ -49,9 +53,13 @@ export default async function AIAdminPage() {
       </div>
     </section>)}</div>
 
+    <section className="card mt-6"><h2 className="text-xl font-bold">最近 7 天 API 使用统计</h2><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Stat label="请求" value={usage.total}/><Stat label="成功率" value={`${usage.successRate}%`}/><Stat label="平均延迟" value={`${usage.averageLatencyMs}ms`}/><Stat label="输入 Token" value={usage.inputTokens}/><Stat label="输出 Token" value={usage.outputTokens}/></div><div className="mt-5 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th className="p-2">Provider</th><th>请求</th><th>成功率</th><th>平均延迟</th><th>Token</th></tr></thead><tbody>{usage.providers.map((item) => <tr className="border-t" key={item.name}><td className="p-2 font-bold">{item.name}</td><td>{item.total}</td><td>{item.successRate}%</td><td>{item.averageLatencyMs}ms</td><td>{item.tokens}</td></tr>)}</tbody></table></div><p className="mt-4 text-sm text-muted">错误分类：{usage.errors.map(([type, count]) => `${type} ${count}`).join(" · ") || "无失败"}</p></section>
+
     <section className="card mt-6"><h2 className="text-xl font-bold">AI 用途路由</h2><p className="mt-1 text-sm text-muted">为每个用途添加一个或多个模型；数字越小越优先，失败时按顺序切换。</p>
       {models.length ? <form action={saveRoute} className="mt-5 grid gap-3 md:grid-cols-[1fr_2fr_1fr_auto]"><select className="input mt-0" name="purpose">{Object.values(AIUsagePurpose).map((purpose) => <option value={purpose} key={purpose}>{purposeLabels[purpose]}</option>)}</select><select className="input mt-0" name="modelId">{models.map((model) => <option value={model.id} key={model.id}>{model.providerName} / {model.displayName}</option>)}</select><input className="input mt-0" type="number" name="priority" defaultValue="100"/><button className="button-primary">添加路由</button></form> : <p className="mt-4 text-muted">请先添加模型。</p>}
       <div className="mt-5 space-y-2">{routes.map((route) => <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700" key={route.id}><strong>{purposeLabels[route.purpose]}</strong><p className="mt-1 text-sm text-muted">{route.models.map((item) => `${item.priority}: ${item.model.provider.name}/${item.model.displayName}`).join(" → ") || "无模型"}</p></div>)}</div>
     </section>
   </div>;
 }
+
+function Stat({ label, value }: { label: string; value: string | number }) { return <div className="metric"><span className="text-muted">{label}</span><strong className="text-2xl">{value}</strong></div>; }
