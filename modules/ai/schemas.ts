@@ -12,8 +12,9 @@ export const providerFormSchema = z.object({
 });
 
 export const modelFormSchema = z.object({
-  providerId: z.string().uuid(), name: z.string().trim().min(1).max(160), displayName: z.string().trim().min(1).max(160),
-  temperature: z.coerce.number().min(0).max(2), maxTokens: z.coerce.number().int().min(1).max(200000), priority: z.coerce.number().int().min(1).max(10000)
+  modelId: z.string().uuid().optional(), providerId: z.string().uuid(), name: z.string().trim().min(1).max(160), displayName: z.string().trim().min(1).max(160),
+  temperature: z.coerce.number().min(0).max(2), maxTokens: z.coerce.number().int().min(1).max(200000), priority: z.coerce.number().int().min(1).max(10000),
+  capabilities: z.string().trim().max(500).default("chat,structured-output"), enabled: z.string().optional(), isDefault: z.string().optional()
 });
 
 export const idSchema = z.object({ id: z.string().uuid() });

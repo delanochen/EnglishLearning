@@ -22,13 +22,20 @@ export async function saveProvider(formData: FormData) {
   revalidatePath("/admin/ai");
 }
 
-export async function addModel(formData: FormData) {
+export async function saveModel(formData: FormData) {
   const user = await requireSystemAdmin();
   const input = modelFormSchema.parse(Object.fromEntries(formData));
-  const model = await db.aIModel.create({ data: { ...input, capabilities: ["chat", "structured-output"] } });
-  await db.auditLog.create({ data: { actorUserId: user.id, action: "ai-model.create", resourceType: "AIModel", resourceId: model.id, metadata: { name: model.name, providerId: model.providerId } } });
+  const data = { providerId: input.providerId, name: input.name, displayName: input.displayName, temperature: input.temperature, maxTokens: input.maxTokens, priority: input.priority, capabilities: input.capabilities.split(",").map((item) => item.trim()).filter(Boolean), enabled: input.modelId ? input.enabled === "on" : true, isDefault: input.isDefault === "on" };
+  const model = await db.$transaction(async (tx) => { if (data.isDefault) await tx.aIModel.updateMany({ where: { providerId: input.providerId, ...(input.modelId ? { id: { not: input.modelId } } : {}) }, data: { isDefault: false } }); return input.modelId ? tx.aIModel.update({ where: { id: input.modelId }, data }) : tx.aIModel.create({ data }); });
+  await db.auditLog.create({ data: { actorUserId: user.id, action: input.modelId ? "ai-model.update" : "ai-model.create", resourceType: "AIModel", resourceId: model.id, metadata: { name: model.name, providerId: model.providerId, enabled: model.enabled, isDefault: model.isDefault } } });
   revalidatePath("/admin/ai");
 }
+
+export const addModel = saveModel;
+
+export async function removeModel(formData:FormData){const user=await requireSystemAdmin();const{id}=idSchema.parse(Object.fromEntries(formData));const model=await db.aIModel.findUniqueOrThrow({where:{id},include:{_count:{select:{requestLogs:true}}}});await db.$transaction(async tx=>{await tx.aIUsageRouteModel.deleteMany({where:{modelId:id}});if(model._count.requestLogs)await tx.aIModel.update({where:{id},data:{enabled:false,isDefault:false,status:"UNKNOWN",lastError:"ARCHIVED"}});else await tx.aIModel.delete({where:{id}});await tx.auditLog.create({data:{actorUserId:user.id,action:model._count.requestLogs?"ai-model.archive":"ai-model.delete",resourceType:"AIModel",resourceId:id}})});revalidatePath("/admin/ai")}
+
+export async function removeRouteModel(formData:FormData){const user=await requireSystemAdmin();const{id}=idSchema.parse(Object.fromEntries(formData));const row=await db.aIUsageRouteModel.findUniqueOrThrow({where:{id}});await db.$transaction([db.aIUsageRouteModel.delete({where:{id}}),db.auditLog.create({data:{actorUserId:user.id,action:"ai-route-model.remove",resourceType:"AIUsageRoute",resourceId:row.routeId,metadata:{modelId:row.modelId}}})]);revalidatePath("/admin/ai")}
 
 export async function toggleProvider(formData: FormData) {
   const user = await requireSystemAdmin(); const { id } = idSchema.parse(Object.fromEntries(formData));
