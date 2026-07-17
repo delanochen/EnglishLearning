@@ -131,3 +131,5 @@ pnpm build
 
 详见 [安全说明](docs/security.md) 与 [Docker/群晖部署说明](docs/deployment.md)。
 升级前请阅读 [群晖升级与回滚](docs/upgrade-rollback.md)，定期按照 [备份与恢复](docs/backup-restore.md) 做恢复演练。
+
+第一次安装请按 [第一次启动与管理员初始化](docs/first-start.md) 操作；部署或运行异常可查阅 [常见问题](docs/faq.md)。AI 模型配置详见 [AI Provider 配置](docs/ai-provider.md)。
