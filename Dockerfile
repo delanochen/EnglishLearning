@@ -8,6 +8,7 @@ COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile=false
 
 FROM base AS builder
+ENV NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=1536
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm exec prisma generate && pnpm run build

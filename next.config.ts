@@ -2,7 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  experimental: { serverActions: { bodySizeLimit: "2mb" } },
+  experimental: {
+    cpus: 1,
+    workerThreads: false,
+    serverActions: { bodySizeLimit: "2mb" }
+  },
   async headers() {
     return [{
       source: "/(.*)",
