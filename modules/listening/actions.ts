@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { requireProfileAccess } from "@/modules/learner/access";
 import { recordMistakeResult } from "@/modules/mistakes/service";
+import { completeTodayTaskForModule } from "@/modules/tasks/module-completion";
 
 export async function submitListening(formData: FormData) {
   const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED");
@@ -18,5 +19,6 @@ export async function submitListening(formData: FormData) {
     for (const item of results) await recordMistakeResult(tx, { learnerProfileId: input.profileId, familyId: profile.familyId, module: "LISTENING", sourceType: "ListeningExercise", sourceId: exercise.id, questionId: item.question.id, prompt: item.question.prompt, answer: item.answer, correctAnswer: item.question.answerKey, explanation: item.question.explanation, correct: item.correct });
     await tx.learningActivity.create({ data: { learnerProfileId: input.profileId, familyId: profile.familyId, activityType: "LISTENING_COMPLETE", module: "LISTENING", score, sourceType: "ListeningExercise", sourceId: exercise.id } });
   });
+  await completeTodayTaskForModule(session.user.id, input.profileId, "LISTENING", score);
   revalidatePath("/learn/listening");
 }

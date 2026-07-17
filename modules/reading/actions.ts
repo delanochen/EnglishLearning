@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { requireProfileAccess } from "@/modules/learner/access";
 import { recordMistakeResult } from "@/modules/mistakes/service";
+import { completeTodayTaskForModule } from "@/modules/tasks/module-completion";
 
 export async function submitReading(formData: FormData) {
   const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED");
@@ -24,6 +25,7 @@ export async function submitReading(formData: FormData) {
     for (const item of results) await recordMistakeResult(tx, { learnerProfileId: input.profileId, familyId: profile.familyId, module: "READING", sourceType: "ReadingArticle", sourceId: article.id, questionId: item.question.id, prompt: item.question.prompt, answer: item.answer, correctAnswer: item.question.answerKey, explanation: item.question.explanation, correct: item.correct });
     await tx.learningActivity.create({ data: { learnerProfileId: input.profileId, familyId: profile.familyId, activityType: "READING_COMPLETE", module: "READING", durationSeconds: input.readingSeconds, score, sourceType: "ReadingArticle", sourceId: article.id } });
   });
+  await completeTodayTaskForModule(session.user.id, input.profileId, "READING", score, input.readingSeconds);
   revalidatePath(`/learn/reading/${article.id}`); revalidatePath("/learn/reading");
 }
 

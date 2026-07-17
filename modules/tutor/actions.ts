@@ -7,6 +7,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { routedChat } from "@/modules/ai/gateway";
 import { requireProfileAccess } from "@/modules/learner/access";
+import { completeTodayTaskForModule } from "@/modules/tasks/module-completion";
 import { buildTutorSystemPrompt } from "./prompt";
 
 const createSchema = z.object({ profileId: z.string().uuid(), topic: z.string().trim().min(2).max(120), teacherStyle: z.enum(["GENTLE", "STRICT", "CHILD", "ACADEMIC", "US_LIFE", "WORKPLACE"]) });
@@ -41,6 +42,7 @@ export async function sendTutorMessage(formData: FormData) {
     db.aIConversation.update({ where: { id: conversation.id }, data: { lastMessageAt: new Date() } }),
     db.learningActivity.create({ data: { learnerProfileId: conversation.learnerProfileId, familyId: accessibleProfile.familyId, activityType: "AI_CHAT", module: "TUTOR", sourceType: "AIConversation", sourceId: conversation.id } })
   ]);
+  await completeTodayTaskForModule(session.user.id, conversation.learnerProfileId, "AI_TUTOR");
   revalidatePath("/learn/tutor");
 }
 

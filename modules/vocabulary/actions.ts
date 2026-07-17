@@ -4,6 +4,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { requireProfileAccess } from "@/modules/learner/access";
+import { completeTodayTaskForModule } from "@/modules/tasks/module-completion";
 import { calculateReview } from "./review";
 
 export async function reviewVocabulary(formData: FormData) {
@@ -22,4 +23,12 @@ export async function reviewVocabulary(formData: FormData) {
     db.learningActivity.create({ data: { learnerProfileId: input.profileId, familyId: profile.familyId, activityType: "VOCAB_REVIEW", module: "VOCABULARY", score: next.quality / 5, sourceType: "Vocabulary", sourceId: input.vocabularyId } })
   ]);
   revalidatePath("/learn/vocabulary");
+}
+
+export async function completeVocabularySession(profileId: string) {
+  const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED");
+  const input = z.string().uuid().parse(profileId);
+  await requireProfileAccess(session.user.id, input);
+  await completeTodayTaskForModule(session.user.id, input, "VOCABULARY");
+  revalidatePath("/tasks"); revalidatePath("/dashboard"); revalidatePath("/learn/vocabulary");
 }

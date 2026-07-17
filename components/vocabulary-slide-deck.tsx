@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { Brain, ChevronLeft, ChevronRight, Eye, RotateCcw, Sparkles, Volume2 } from "lucide-react";
-import { reviewVocabulary } from "@/modules/vocabulary/actions";
+import { completeVocabularySession, reviewVocabulary } from "@/modules/vocabulary/actions";
 
 export type VocabularySlide = {
   id: string;
@@ -79,7 +79,9 @@ export function VocabularySlideDeck({ profileId, slides, english }: { profileId:
     data.set("quality", String(quality));
     startTransition(async () => {
       await reviewVocabulary(data);
-      setReviewed((value) => ({ ...value, [currentId]: quality }));
+      const nextReviewed = { ...reviewed, [currentId]: quality };
+      if (Object.keys(nextReviewed).length === slides.length) await completeVocabularySession(profileId);
+      setReviewed(nextReviewed);
       if (index < slides.length - 1) move(index + 1);
     });
   }

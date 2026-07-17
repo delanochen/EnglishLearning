@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { requireProfileAccess } from "@/modules/learner/access";
 import { recordMistakeResult } from "@/modules/mistakes/service";
+import { completeTodayTaskForModule } from "@/modules/tasks/module-completion";
 import { scoreGrammarAnswer, updateGrammarMastery } from "./scoring";
 
 export async function submitGrammar(formData: FormData) {
@@ -24,5 +25,6 @@ export async function submitGrammar(formData: FormData) {
     await tx.grammarProgress.update({ where: { id: progress.id }, data: { mastery: next.mastery, weaknessScore: next.weaknessScore, lastPracticedAt: now, nextReviewAt, correctCount: { increment: correct }, incorrectCount: { increment: answers.length - correct } } });
     await tx.learningActivity.create({ data: { learnerProfileId: input.profileId, familyId: profile.familyId, activityType: "GRAMMAR_PRACTICE", module: "GRAMMAR", score: answers.length ? correct / answers.length : 1, sourceType: "GrammarTopic", sourceId: topic.id } });
   });
+  await completeTodayTaskForModule(session.user.id, input.profileId, "GRAMMAR", answers.length ? correct / answers.length : 1);
   revalidatePath(`/learn/grammar/${topic.id}`); revalidatePath("/learn/grammar"); revalidatePath("/dashboard");
 }
