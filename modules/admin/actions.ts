@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
-import { contentEditSchema, grammarExampleSchema, grammarExerciseSchema, grammarMetadataSchema, grammarPublishReadiness, listeningContentSchema, parseContrastLines, readingContentSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, csv, lines } from "./content-schemas";
+import { contentEditSchema, grammarExampleSchema, grammarExerciseSchema, grammarMetadataSchema, grammarPublishReadiness, listeningContentSchema, parseContrastLines, readingContentSchema, readingMetadataSchema, readingPublishReadiness, readingQuestionSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, csv, lines } from "./content-schemas";
 
 async function audit(actorUserId: string, action: string, resourceType: string, resourceId: string, metadata?: object) {
   await db.auditLog.create({ data: { actorUserId, action, resourceType, resourceId, metadata } });
@@ -26,7 +26,14 @@ const contentInput = z.object({ type: z.enum(["vocabulary", "reading", "grammar"
 export async function updateContentStatus(formData: FormData) {
   const actor = await requireSystemAdmin(); const input = contentInput.parse(Object.fromEntries(formData));
   if (input.type === "vocabulary") await db.vocabulary.update({ where: { id: input.id }, data: { status: input.status } });
-  if (input.type === "reading") await db.readingArticle.update({ where: { id: input.id }, data: { status: input.status } });
+  if (input.type === "reading") {
+    if (input.status === "PUBLISHED") {
+      const article = await db.readingArticle.findUniqueOrThrow({ where: { id: input.id }, include: { _count: { select: { questions: true } } } });
+      const missing = readingPublishReadiness({ questions: article._count.questions, targetVocabulary: article.targetVocabulary.length, summary: article.summary, oralRetellingPrompt: article.oralRetellingPrompt, writingExtensionPrompt: article.writingExtensionPrompt });
+      if (missing.length) throw new Error(`READING_NOT_READY:${missing.join("；")}`);
+    }
+    await db.readingArticle.update({ where: { id: input.id }, data: { status: input.status } });
+  }
   if (input.type === "grammar") {
     if (input.status === "PUBLISHED") {
       const topic = await db.grammarTopic.findUniqueOrThrow({ where: { id: input.id }, include: { _count: { select: { examples: true, exercises: true } } } });
@@ -151,5 +158,21 @@ export async function deleteGrammarItem(formData: FormData) {
   if (input.type === "example") await db.grammarExample.deleteMany({ where: { id: input.id, topicId: input.topicId } });
   else await db.grammarExercise.deleteMany({ where: { id: input.id, topicId: input.topicId } });
   await audit(actor.id, "GRAMMAR_ITEM_DELETED", input.type, input.id, { topicId: input.topicId }); revalidatePath(`/admin/content/grammar/${input.topicId}`);
+}
+export async function updateReadingMetadata(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = readingMetadataSchema.parse(Object.fromEntries(formData));
+  await db.readingArticle.update({ where: { id: input.articleId }, data: { title: input.title, body: input.body, translation: input.translation || null, level: input.level, audience: input.audience, topic: input.topic, targetVocabulary: csv(input.targetVocabulary), targetGrammar: csv(input.targetGrammar), summary: input.summary, oralRetellingPrompt: input.oralRetellingPrompt, writingExtensionPrompt: input.writingExtensionPrompt, wordCount: input.body.split(/\s+/).filter(Boolean).length } });
+  await audit(actor.id, "READING_METADATA_UPDATED", "ReadingArticle", input.articleId); revalidatePath(`/admin/content/reading/${input.articleId}`); revalidatePath("/admin/content");
+}
+export async function addReadingQuestion(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = readingQuestionSchema.parse(Object.fromEntries(formData)); const options = lines(input.options);
+  if (["MULTIPLE_CHOICE", "TRUE_FALSE", "VOCABULARY"].includes(input.type) && (options.length < 2 || !options.includes(input.answerKey))) throw new Error("READING_OPTIONS_INVALID");
+  const last = await db.readingQuestion.aggregate({ where: { articleId: input.articleId }, _max: { order: true } });
+  const row = await db.readingQuestion.create({ data: { articleId: input.articleId, order: (last._max.order ?? 0) + 1, type: input.type, prompt: input.prompt, options: options.length ? options : undefined, answerKey: input.answerKey, explanation: input.explanation || null } });
+  await audit(actor.id, "READING_QUESTION_ADDED", "ReadingQuestion", row.id, { articleId: input.articleId }); revalidatePath(`/admin/content/reading/${input.articleId}`);
+}
+export async function deleteReadingQuestion(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = z.object({ articleId: z.string().uuid(), id: z.string().uuid() }).parse(Object.fromEntries(formData));
+  await db.readingQuestion.deleteMany({ where: { id: input.id, articleId: input.articleId } }); await audit(actor.id, "READING_QUESTION_DELETED", "ReadingQuestion", input.id, { articleId: input.articleId }); revalidatePath(`/admin/content/reading/${input.articleId}`);
 }
 export async function archiveUploadedFile(formData:FormData){const actor=await requireSystemAdmin();const id=z.string().uuid().parse(formData.get("id"));await db.uploadedFile.update({where:{id},data:{status:"ARCHIVED",deletedAt:new Date()}});await audit(actor.id,"FILE_ARCHIVED","UploadedFile",id);revalidatePath("/admin/files")}

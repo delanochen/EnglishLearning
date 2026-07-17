@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentEditSchema, csv, grammarPublishReadiness, listeningContentSchema, parseContrastLines, readingContentSchema, scenarioExerciseSchema, scenarioPublishReadiness } from "@/modules/admin/content-schemas";
+import { contentEditSchema, csv, grammarPublishReadiness, listeningContentSchema, parseContrastLines, readingContentSchema, readingPublishReadiness, scenarioExerciseSchema, scenarioPublishReadiness } from "@/modules/admin/content-schemas";
 
 describe("admin content schemas", () => {
   it("normalizes target lists for manually authored reading lessons", () => {
@@ -27,5 +27,9 @@ describe("admin content schemas", () => {
     expect(parseContrastLines("She works. | She work. | Add -s after she.")).toEqual([{ correct: "She works.", incorrect: "She work.", note: "Add -s after she." }]);
     expect(grammarPublishReadiness({ examples: 1, exercises: 2, useCases: 0, commonErrors: 0 })).toHaveLength(4);
     expect(grammarPublishReadiness({ examples: 2, exercises: 3, useCases: 1, commonErrors: 1 })).toEqual([]);
+  });
+  it("requires a complete graded-reading lesson before publishing", () => {
+    expect(readingPublishReadiness({ questions: 2, targetVocabulary: 1, summary: "", oralRetellingPrompt: "", writingExtensionPrompt: "" })).toHaveLength(5);
+    expect(readingPublishReadiness({ questions: 5, targetVocabulary: 2, summary: "Summary", oralRetellingPrompt: "Retell", writingExtensionPrompt: "Write" })).toEqual([]);
   });
 });

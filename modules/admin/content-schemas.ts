@@ -53,6 +53,8 @@ export const grammarMetadataSchema = z.object({
 });
 export const grammarExampleSchema = z.object({ topicId: z.string().uuid(), sentence: z.string().trim().min(2).max(2000), translation: z.string().trim().max(2000).optional(), explanation: z.string().trim().max(2000).optional(), isError: z.string().optional() });
 export const grammarExerciseSchema = z.object({ topicId: z.string().uuid(), type: z.enum(["MULTIPLE_CHOICE", "FILL_BLANK", "ERROR_CORRECTION", "REORDER", "TRANSLATION", "SENTENCE_CREATION", "AI_DIALOGUE"]), prompt: z.string().trim().min(2).max(2000), options: z.string().max(5000), answerKey: z.string().trim().min(1).max(2000), explanation: z.string().trim().max(2000).optional() });
+export const readingMetadataSchema = z.object({ articleId: z.string().uuid(), title: z.string().trim().min(1).max(160), body: z.string().trim().min(50).max(30_000), translation: z.string().trim().max(30_000).optional(), level: cefrSchema, audience: z.string().trim().min(1).max(120), topic: z.string().trim().min(1).max(120), targetVocabulary: z.string().max(2000), targetGrammar: z.string().max(2000), summary: z.string().trim().min(10).max(5000), oralRetellingPrompt: z.string().trim().min(5).max(2000), writingExtensionPrompt: z.string().trim().min(5).max(2000) });
+export const readingQuestionSchema = z.object({ articleId: z.string().uuid(), type: z.enum(["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "VOCABULARY"]), prompt: z.string().trim().min(2).max(2000), options: z.string().max(5000), answerKey: z.string().trim().min(1).max(2000), explanation: z.string().trim().max(2000).optional() });
 
 export function lines(value = "") { return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
 export function parseContrastLines(value = "") { return lines(value).map((line) => { const [correct = "", incorrect = "", note = ""] = line.split("|").map((item) => item.trim()); return { correct, incorrect, note }; }).filter((item) => item.correct && item.incorrect); }
@@ -71,6 +73,15 @@ export function grammarPublishReadiness(counts: { examples: number; exercises: n
   if (counts.exercises < 3) missing.push("至少 3 道练习题");
   if (counts.useCases < 1) missing.push("至少 1 个适用场景");
   if (counts.commonErrors < 1) missing.push("至少 1 条常见错误");
+  return missing;
+}
+export function readingPublishReadiness(input: { questions: number; targetVocabulary: number; summary: string; oralRetellingPrompt: string; writingExtensionPrompt: string }) {
+  const missing: string[] = [];
+  if (input.questions < 5) missing.push("至少 5 道阅读与延伸题");
+  if (input.targetVocabulary < 2) missing.push("至少 2 个目标词汇");
+  if (!input.summary.trim()) missing.push("文章总结");
+  if (!input.oralRetellingPrompt.trim()) missing.push("口头复述任务");
+  if (!input.writingExtensionPrompt.trim()) missing.push("写作延伸任务");
   return missing;
 }
 
