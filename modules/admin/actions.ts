@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
+import { contentEditSchema, listeningContentSchema, readingContentSchema, csv } from "./content-schemas";
 
 async function audit(actorUserId: string, action: string, resourceType: string, resourceId: string, metadata?: object) {
   await db.auditLog.create({ data: { actorUserId, action, resourceType, resourceId, metadata } });
@@ -57,5 +58,24 @@ export async function createGrammarTopic(formData: FormData) {
 }
 export async function createScenarioLesson(formData: FormData) {
   const actor=await requireSystemAdmin();const input=z.object({category:z.string().trim().min(1).max(100),title:z.string().trim().min(1).max(160),intro:z.string().trim().min(1).max(3000),level:z.enum(["PRE_A1","A1","A2","B1","B2","C1"])}).parse(Object.fromEntries(formData));const row=await db.scenarioLesson.create({data:{...input,status:"DRAFT",cultureTips:[],misunderstandings:[],naturalExpressions:[],sourceType:"ORIGINAL",sourceNote:"管理员原创内容"}});await audit(actor.id,"CONTENT_CREATED","ScenarioLesson",row.id);revalidatePath("/admin/content");
+}
+export async function createReadingArticle(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = readingContentSchema.parse(Object.fromEntries(formData));
+  const row = await db.readingArticle.create({ data: { ...input, translation: input.translation || null, wordCount: input.body.split(/\s+/).length, targetVocabulary: csv(input.targetVocabulary), targetGrammar: csv(input.targetGrammar), status: "DRAFT", aiGenerated: false } });
+  await audit(actor.id, "CONTENT_CREATED", "ReadingArticle", row.id); revalidatePath("/admin/content");
+}
+export async function createListeningExercise(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = listeningContentSchema.parse(Object.fromEntries(formData));
+  const row = await db.listeningExercise.create({ data: { ...input, translation: input.translation || null, audioUrl: input.audioUrl || null, status: "DRAFT" } });
+  await audit(actor.id, "CONTENT_CREATED", "ListeningExercise", row.id); revalidatePath("/admin/content");
+}
+export async function updateContentDetails(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = contentEditSchema.parse(Object.fromEntries(formData));
+  if (input.type === "vocabulary") await db.$transaction(async (tx) => { await tx.vocabulary.update({ where: { id: input.id }, data: { word: input.title, definitionEn: input.primary, topic: input.topic || "general", level: input.level } }); await tx.vocabularyMeaning.upsert({ where: { vocabularyId_locale_senseOrder: { vocabularyId: input.id, locale: "zh-CN", senseOrder: 1 } }, update: { definition: input.secondary || "" }, create: { vocabularyId: input.id, locale: "zh-CN", senseOrder: 1, definition: input.secondary || "" } }); });
+  if (input.type === "reading") await db.readingArticle.update({ where: { id: input.id }, data: { title: input.title, body: input.primary, translation: input.secondary || null, topic: input.topic || "general", level: input.level, wordCount: input.primary.split(/\s+/).length } });
+  if (input.type === "grammar") await db.grammarTopic.update({ where: { id: input.id }, data: { title: input.title, ruleEn: input.primary, ruleZh: input.secondary || "", level: input.level } });
+  if (input.type === "scenario") await db.scenarioLesson.update({ where: { id: input.id }, data: { title: input.title, intro: input.primary, category: input.topic || "general", level: input.level, version: { increment: 1 } } });
+  if (input.type === "listening") await db.listeningExercise.update({ where: { id: input.id }, data: { title: input.title, transcript: input.primary, translation: input.secondary || null, topic: input.topic || "general", level: input.level } });
+  await audit(actor.id, "CONTENT_UPDATED", input.type, input.id, { level: input.level }); revalidatePath("/admin/content");
 }
 export async function archiveUploadedFile(formData:FormData){const actor=await requireSystemAdmin();const id=z.string().uuid().parse(formData.get("id"));await db.uploadedFile.update({where:{id},data:{status:"ARCHIVED",deletedAt:new Date()}});await audit(actor.id,"FILE_ARCHIVED","UploadedFile",id);revalidatePath("/admin/files")}
