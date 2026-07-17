@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
-import { contentEditSchema, grammarExampleSchema, grammarExerciseSchema, grammarMetadataSchema, grammarPublishReadiness, listeningContentSchema, listeningMetadataSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingMetadataSchema, readingPublishReadiness, readingQuestionSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, vocabularyExampleSchema, vocabularyMetadataSchema, vocabularyPublishReadiness, vocabularyRelationSchema, csv, lines } from "./content-schemas";
+import { contentEditSchema, grammarExampleSchema, grammarExerciseSchema, grammarMetadataSchema, grammarPublishReadiness, listeningContentSchema, listeningMetadataSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingMetadataSchema, readingPublishReadiness, readingQuestionSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, vocabularyExampleSchema, vocabularyMetadataSchema, vocabularyPublishReadiness, vocabularyRelationSchema, writingAssignmentSchema, writingPublishReadiness, csv, lines } from "./content-schemas";
 
 async function audit(actorUserId: string, action: string, resourceType: string, resourceId: string, metadata?: object) {
   await db.auditLog.create({ data: { actorUserId, action, resourceType, resourceId, metadata } });
@@ -22,7 +22,7 @@ export async function updateUserStatus(formData: FormData) {
   revalidatePath("/admin/users");
 }
 
-const contentInput = z.object({ type: z.enum(["vocabulary", "reading", "grammar", "scenario", "listening"]), id: z.string().uuid(), status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]) });
+const contentInput = z.object({ type: z.enum(["vocabulary", "reading", "grammar", "scenario", "listening", "writing"]), id: z.string().uuid(), status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]) });
 export async function updateContentStatus(formData: FormData) {
   const actor = await requireSystemAdmin(); const input = contentInput.parse(Object.fromEntries(formData));
   if (input.type === "vocabulary") {
@@ -64,6 +64,10 @@ export async function updateContentStatus(formData: FormData) {
     }
     await db.listeningExercise.update({ where: { id: input.id }, data: { status: input.status } });
   }
+  if (input.type === "writing") {
+    if (input.status === "PUBLISHED") { const assignment = await db.writingAssignment.findUniqueOrThrow({ where: { id: input.id } }); const missing = writingPublishReadiness(assignment); if (missing.length) throw new Error(`WRITING_NOT_READY:${missing.join("；")}`); }
+    await db.writingAssignment.update({ where: { id: input.id }, data: { status: input.status } });
+  }
   await audit(actor.id, "CONTENT_STATUS_UPDATED", input.type, input.id, { status: input.status }); revalidatePath("/admin/content");
 }
 
@@ -102,6 +106,9 @@ export async function createListeningExercise(formData: FormData) {
   const actor = await requireSystemAdmin(); const input = listeningContentSchema.parse(Object.fromEntries(formData));
   const row = await db.listeningExercise.create({ data: { ...input, translation: input.translation || null, audioUrl: input.audioUrl || null, status: "DRAFT" } });
   await audit(actor.id, "CONTENT_CREATED", "ListeningExercise", row.id); revalidatePath("/admin/content");
+}
+export async function createWritingAssignment(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = writingAssignmentSchema.omit({ assignmentId: true }).parse(Object.fromEntries(formData)); const row = await db.writingAssignment.create({ data: { ...input, status: "DRAFT" } }); await audit(actor.id, "CONTENT_CREATED", "WritingAssignment", row.id); revalidatePath("/admin/content");
 }
 export async function updateContentDetails(formData: FormData) {
   const actor = await requireSystemAdmin(); const input = contentEditSchema.parse(Object.fromEntries(formData));
@@ -222,5 +229,8 @@ export async function addVocabularyRelation(formData: FormData) {
 }
 export async function deleteVocabularyRelation(formData: FormData) {
   const actor = await requireSystemAdmin(); const input = z.object({ vocabularyId: z.string().uuid(), id: z.string().uuid() }).parse(Object.fromEntries(formData)); await db.vocabularyRelation.deleteMany({ where: { id: input.id, sourceId: input.vocabularyId } }); await audit(actor.id, "VOCABULARY_RELATION_DELETED", "VocabularyRelation", input.id); revalidatePath(`/admin/content/vocabulary/${input.vocabularyId}`);
+}
+export async function updateWritingAssignment(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = writingAssignmentSchema.required({ assignmentId: true }).parse(Object.fromEntries(formData)); await db.writingAssignment.update({ where: { id: input.assignmentId }, data: { title: input.title, type: input.type, prompt: input.prompt, level: input.level, targetWords: input.targetWords } }); await audit(actor.id, "WRITING_ASSIGNMENT_UPDATED", "WritingAssignment", input.assignmentId); revalidatePath(`/admin/content/writing/${input.assignmentId}`); revalidatePath("/admin/content");
 }
 export async function archiveUploadedFile(formData:FormData){const actor=await requireSystemAdmin();const id=z.string().uuid().parse(formData.get("id"));await db.uploadedFile.update({where:{id},data:{status:"ARCHIVED",deletedAt:new Date()}});await audit(actor.id,"FILE_ARCHIVED","UploadedFile",id);revalidatePath("/admin/files")}

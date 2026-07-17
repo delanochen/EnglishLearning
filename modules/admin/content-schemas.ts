@@ -60,6 +60,7 @@ export const listeningQuestionSchema = z.object({ exerciseId: z.string().uuid(),
 export const vocabularyMetadataSchema = z.object({ vocabularyId: z.string().uuid(), word: z.string().trim().min(1).max(80), phonetic: z.string().trim().max(80).optional(), partOfSpeech: z.string().trim().min(1).max(40), definitionEn: z.string().trim().min(2).max(1000), definitionZh: z.string().trim().min(1).max(1000), level: cefrSchema, topic: z.string().trim().min(1).max(100), audioUrl: z.string().trim().url().max(1000).optional().or(z.literal("")), imageUrl: z.string().trim().url().max(1000).optional().or(z.literal("")) });
 export const vocabularyExampleSchema = z.object({ vocabularyId: z.string().uuid(), sentence: z.string().trim().min(2).max(2000), translation: z.string().trim().max(2000).optional(), collocations: z.string().max(2000), difficulty: cefrSchema });
 export const vocabularyRelationSchema = z.object({ vocabularyId: z.string().uuid(), targetWord: z.string().trim().min(1).max(80), type: z.enum(["SYNONYM", "ANTONYM"]) });
+export const writingAssignmentSchema = z.object({ assignmentId: z.string().uuid().optional(), title: z.string().trim().min(2).max(160), type: z.enum(["SENTENCES", "PARAGRAPH", "EMAIL", "HIGH_SCHOOL_ESSAY", "JOURNAL", "IMAGE_DESCRIPTION", "OPINION", "WORKPLACE"]), prompt: z.string().trim().min(20).max(5000), level: cefrSchema, targetWords: z.coerce.number().int().min(20).max(2000) });
 
 export function lines(value = "") { return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
 export function parseContrastLines(value = "") { return lines(value).map((line) => { const [correct = "", incorrect = "", note = ""] = line.split("|").map((item) => item.trim()); return { correct, incorrect, note }; }).filter((item) => item.correct && item.incorrect); }
@@ -99,6 +100,12 @@ export function vocabularyPublishReadiness(input: { meanings: number; examples: 
   const missing: string[] = [];
   if (input.meanings < 1) missing.push("至少 1 条中文释义");
   if (input.examples < 1) missing.push("至少 1 个情境例句");
+  return missing;
+}
+export function writingPublishReadiness(input: { prompt: string; targetWords: number }) {
+  const missing: string[] = [];
+  if (input.prompt.trim().length < 20) missing.push("清晰完整的写作要求");
+  if (input.targetWords < 20) missing.push("不少于 20 词的目标字数");
   return missing;
 }
 

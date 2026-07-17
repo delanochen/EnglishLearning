@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentEditSchema, csv, grammarPublishReadiness, listeningContentSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingPublishReadiness, scenarioExerciseSchema, scenarioPublishReadiness, vocabularyPublishReadiness } from "@/modules/admin/content-schemas";
+import { contentEditSchema, csv, grammarPublishReadiness, listeningContentSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingPublishReadiness, scenarioExerciseSchema, scenarioPublishReadiness, vocabularyPublishReadiness, writingAssignmentSchema, writingPublishReadiness } from "@/modules/admin/content-schemas";
 
 describe("admin content schemas", () => {
   it("normalizes target lists for manually authored reading lessons", () => {
@@ -18,6 +18,11 @@ describe("admin content schemas", () => {
   it("blocks incomplete vocabulary entries from publication", () => {
     expect(vocabularyPublishReadiness({ meanings: 0, examples: 0 })).toHaveLength(2);
     expect(vocabularyPublishReadiness({ meanings: 1, examples: 1 })).toEqual([]);
+  });
+  it("validates writing assignments and publication readiness", () => {
+    expect(writingAssignmentSchema.parse({ title:"Work email",type:"EMAIL",prompt:"Write a polite email asking your manager for one day off.",level:"B1",targetWords:"120" }).targetWords).toBe(120);
+    expect(writingPublishReadiness({ prompt:"Too short",targetWords:10 })).toHaveLength(2);
+    expect(writingPublishReadiness({ prompt:"Write a complete paragraph about your daily routine.",targetWords:80 })).toEqual([]);
   });
 
   it("rejects invalid content edits", () => {
