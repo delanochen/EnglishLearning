@@ -15,18 +15,11 @@ test("login, member selection, and active-learner isolation work end to end", as
   await page.getByRole("button", { name: "登录" }).click();
   await expect(page).toHaveURL(/\/profiles/);
 
-  if (!await page.getByRole("heading", { name: "E2E Learner" }).isVisible().catch(() => false)) {
-    await page.getByRole("link", { name: "管理家庭成员" }).click();
-    if (await page.getByRole("button", { name: "创建家庭" }).isVisible().catch(() => false)) {
-      await page.getByLabel("家庭名称").fill("E2E Family");
-      await page.getByRole("button", { name: "创建家庭" }).click();
-      await expect(page.getByRole("heading", { name: "E2E Family" })).toBeVisible();
-    }
-    await page.getByPlaceholder("成员姓名").fill("E2E Learner");
-    await page.getByRole("button", { name: "添加" }).click();
-    await expect(page.getByText("E2E Learner", { exact: true }).first()).toBeVisible();
-    await page.goto("/profiles");
-  }
+  await page.goto("/family");
+  await expect(page.getByRole("heading", { name: "E2E Family" })).toBeVisible();
+  await expect(page.getByPlaceholder("成员姓名")).toBeVisible();
+  await expect(page.getByText("E2E Learner", { exact: true }).first()).toBeVisible();
+  await page.goto("/profiles");
 
   const learnerCard = page.locator("form").filter({ has: page.getByRole("heading", { name: "E2E Learner" }) });
   await learnerCard.getByRole("button", { name: "开始学习" }).click();

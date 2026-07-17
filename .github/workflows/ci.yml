@@ -46,6 +46,7 @@ jobs:
       - run: pnpm prisma migrate deploy
       - run: pnpm exec tsx prisma/seed.ts
       - run: pnpm exec tsx scripts/init-admin.ts
+      - run: pnpm exec tsx scripts/init-e2e-fixture.ts
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
