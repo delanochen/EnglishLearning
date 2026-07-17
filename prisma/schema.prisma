@@ -1185,8 +1185,11 @@ model WritingFeedback {
   id               String            @id @default(uuid()) @db.Uuid
   submissionId     String            @unique @db.Uuid
   grammarScore     Float
+  spellingScore    Float             @default(0)
   vocabularyScore  Float
   structureScore   Float
+  naturalnessScore Float             @default(0)
+  annotations      Json              @default("[]")
   suggestions      String            @db.Text
   rewrittenVersion String?           @db.Text
   overallScore     Float

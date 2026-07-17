@@ -1,0 +1,4 @@
+ALTER TABLE "WritingFeedback"
+  ADD COLUMN "spellingScore" DOUBLE PRECISION NOT NULL DEFAULT 0,
+  ADD COLUMN "naturalnessScore" DOUBLE PRECISION NOT NULL DEFAULT 0,
+  ADD COLUMN "annotations" JSONB NOT NULL DEFAULT '[]'::jsonb;
