@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { getAccessContext } from "@/modules/authorization/context";
@@ -39,7 +40,7 @@ export async function createMember(formData: FormData) {
   const context = await getAccessContext(session.user.id); if (!canManageFamily(context, input.familyId)) throw new Error("FORBIDDEN");
   await db.$transaction(async (tx) => {
     const member = await tx.familyMember.create({ data: { familyId: input.familyId, displayName: input.displayName, nickname: input.nickname || null, memberType: input.memberType } });
-    await tx.learnerProfile.create({ data: { familyMemberId: member.id, ageBand: input.ageBand, dailyMinutes: input.dailyMinutes, goals: [], interests: [], weakAreas: [] } });
+    await tx.learnerProfile.create({ data: { familyMemberId: member.id, ageBand: input.ageBand, dailyMinutes: input.dailyMinutes, dailyVocabularyGoal: input.dailyVocabularyGoal, goals: [], interests: [], weakAreas: [] } });
     await tx.auditLog.create({ data: { actorUserId: session.user.id, familyId: input.familyId, action: "family-member.create", resourceType: "FamilyMember", resourceId: member.id } });
   });
   revalidatePath("/family");
@@ -61,10 +62,10 @@ export async function updateMember(formData: FormData) {
       where: { id: existing.id },
       data: { displayName: input.displayName, nickname: input.nickname || null, memberType }
     });
-    if (existing.learnerProfile && input.ageBand && input.dailyMinutes) {
+    if (existing.learnerProfile) {
       await tx.learnerProfile.update({
         where: { id: existing.learnerProfile.id },
-        data: { ageBand: input.ageBand, dailyMinutes: input.dailyMinutes, goals: input.goals?.split(/[，,]/).map((x) => x.trim()).filter(Boolean) ?? existing.learnerProfile.goals, interests: input.interests?.split(/[，,]/).map((x) => x.trim()).filter(Boolean) ?? existing.learnerProfile.interests, weakAreas: input.weakAreas?.split(/[，,]/).map((x) => x.trim()).filter(Boolean) ?? existing.learnerProfile.weakAreas }
+        data: { ageBand: input.ageBand ?? existing.learnerProfile.ageBand, dailyMinutes: input.dailyMinutes ?? existing.learnerProfile.dailyMinutes, dailyVocabularyGoal: input.dailyVocabularyGoal ?? existing.learnerProfile.dailyVocabularyGoal, goals: input.goals?.split(/[，,]/).map((x) => x.trim()).filter(Boolean) ?? existing.learnerProfile.goals, interests: input.interests?.split(/[，,]/).map((x) => x.trim()).filter(Boolean) ?? existing.learnerProfile.interests, weakAreas: input.weakAreas?.split(/[，,]/).map((x) => x.trim()).filter(Boolean) ?? existing.learnerProfile.weakAreas }
       });
     }
     await tx.auditLog.create({
@@ -75,13 +76,14 @@ export async function updateMember(formData: FormData) {
         resourceType: "FamilyMember",
         resourceId: existing.id,
         metadata: {
-          before: { displayName: existing.displayName, nickname: existing.nickname, memberType: existing.memberType, ageBand: existing.learnerProfile?.ageBand, dailyMinutes: existing.learnerProfile?.dailyMinutes },
-          after: { displayName: input.displayName, nickname: input.nickname || null, memberType, ageBand: input.ageBand, dailyMinutes: input.dailyMinutes, goals: input.goals, interests: input.interests, weakAreas: input.weakAreas }
+          before: { displayName: existing.displayName, nickname: existing.nickname, memberType: existing.memberType, ageBand: existing.learnerProfile?.ageBand, dailyMinutes: existing.learnerProfile?.dailyMinutes, dailyVocabularyGoal: existing.learnerProfile?.dailyVocabularyGoal },
+          after: { displayName: input.displayName, nickname: input.nickname || null, memberType, ageBand: input.ageBand, dailyMinutes: input.dailyMinutes, dailyVocabularyGoal: input.dailyVocabularyGoal, goals: input.goals, interests: input.interests, weakAreas: input.weakAreas }
         }
       }
     });
   });
-  revalidatePath("/family");
+  revalidatePath("/family"); revalidatePath("/profiles"); revalidatePath("/dashboard"); revalidatePath("/tasks"); revalidatePath("/learn/vocabulary");
+  redirect(`/family?saved=${existing.id}`);
 }
 
 async function setMemberArchived(formData: FormData, archived: boolean) {

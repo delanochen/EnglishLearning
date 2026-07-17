@@ -287,6 +287,7 @@ model LearnerProfile {
   cefrLevel          CefrLevel?
   goals              String[]
   dailyMinutes       Int                      @default(20)
+  dailyVocabularyGoal Int                     @default(10)
   interests          String[]
   weakAreas          String[]
   totalXp            Int                      @default(0)
@@ -298,7 +299,9 @@ model LearnerProfile {
   conversations      AIConversation[]
   vocabularyProgress UserVocabularyProgress[]
   readingProgress    ReadingProgress[]
+  dailyReadingAssignments DailyReadingAssignment[]
   dailyTasks         DailyTask[]
+  quizSessions       QuizSession[]
   activities         LearningActivity[]
   grammarProgress    GrammarProgress[]
   listeningProgress  ListeningProgress[]
@@ -682,8 +685,23 @@ model ReadingArticle {
   updatedAt        DateTime          @updatedAt
   questions        ReadingQuestion[]
   progress         ReadingProgress[]
+  dailyAssignments DailyReadingAssignment[]
 
   @@index([level, topic, status])
+}
+
+model DailyReadingAssignment {
+  id               String         @id @default(uuid()) @db.Uuid
+  learnerProfileId String         @db.Uuid
+  articleId        String         @db.Uuid
+  assignmentDate   DateTime       @db.Date
+  generationSource String         @default("AI")
+  createdAt        DateTime       @default(now())
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  article          ReadingArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([learnerProfileId, assignmentDate])
+  @@index([articleId])
 }
 
 model ReadingQuestion {
@@ -748,10 +766,38 @@ model DailyTask {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   learnerProfile   LearnerProfile    @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  quizSession      QuizSession?
   completions      TaskCompletion[]
   planItem         LearningPlanItem? @relation(fields: [planItemId], references: [id], onDelete: SetNull)
 
   @@index([learnerProfileId, taskDate, status])
+}
+
+model QuizSession {
+  id               String         @id @default(uuid()) @db.Uuid
+  learnerProfileId String         @db.Uuid
+  taskId           String         @unique @db.Uuid
+  level            CefrLevel?
+  score            Float?
+  completedAt      DateTime?
+  createdAt        DateTime       @default(now())
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  task             DailyTask      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  questions        QuizQuestion[]
+}
+
+model QuizQuestion {
+  id          String      @id @default(uuid()) @db.Uuid
+  sessionId   String      @db.Uuid
+  type        String
+  prompt      String
+  options     String[]
+  answerKey   String
+  explanation String?
+  order       Int
+  session     QuizSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, order])
 }
 
 model LearningPlan {

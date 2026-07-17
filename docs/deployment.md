@@ -12,6 +12,28 @@ chmod +x scripts/nas-deploy.sh
 ./scripts/nas-deploy.sh
 ```
 
+## GitHub 推送后自动更新
+
+仓库提供 `scripts/nas-auto-update.sh`。它只在 `origin/main` 出现新提交时调用完整部署流程，并使用目录锁避免两个部署同时运行。若 NAS 上的受版本控制文件存在本地修改，脚本会停止，避免覆盖修改。
+
+在群晖打开“控制面板 → 任务计划 → 新增 → 计划的任务 → 用户定义的脚本”：
+
+- 用户：`root`
+- 频率：每 10 分钟（家庭环境建议，不必每分钟检查）
+- 用户定义的脚本：
+
+```sh
+/bin/sh /volume2/docker/EnglishLearning/scripts/nas-auto-update.sh
+```
+
+运行日志保存在：
+
+```text
+/volume2/docker/EnglishLearning/logs/auto-update.log
+```
+
+第一次启用计划任务前，仍应手工运行一次 `./scripts/nas-deploy.sh`，确认 secrets、备份、数据库迁移和健康检查全部正常。自动更新不会自动覆盖 NAS 本地代码，也不会在健康检查失败后把失败部署记录成成功。
+
 ## 自动每日任务、周报和月度评估
 
 在群晖任务计划中每天凌晨运行以下命令。任务具有幂等性：每天自动生成个性化任务，同一成员同一周期只生成一次周报或月报：

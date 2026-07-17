@@ -1,9 +1,48 @@
 import { cookies } from "next/headers";
-import { auth } from "@/auth"; import { db } from "@/lib/db"; import { ProfilePicker } from "@/components/profile-picker"; import { VocabularyPractice } from "@/components/vocabulary-practice"; import { getAccessibleProfiles } from "@/modules/learner/access"; import { reviewVocabulary } from "@/modules/vocabulary/actions";
+import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { VocabularySlideDeck } from "@/components/vocabulary-slide-deck";
+import { getAccessibleProfiles } from "@/modules/learner/access";
 
 export default async function VocabularyPage({ searchParams }: { searchParams: Promise<{ profile?: string }> }) {
-  const session = await auth(); const english = (await cookies()).get("ui_locale")?.value === "en"; const params = await searchParams; const profiles = await getAccessibleProfiles(session!.user.id); const selected = profiles.find((profile) => profile.id === params.profile) ?? profiles[0];
-  const words = await db.vocabulary.findMany({ where: { status: "PUBLISHED", ...(selected?.level ? { level: selected.level } : {}) }, include: { meanings: true, examples: true, relationsFrom: { include: { target: true } }, relationsTo: { include: { source: true } }, progress: selected ? { where: { learnerProfileId: selected.id } } : false }, orderBy: [{ topic: "asc" }, { word: "asc" }], take: 30 });
-  const t = english ? { title: "Vocabulary learning and review", help: "Your next review is scheduled automatically from practice results.", noZh: "No Chinese explanation", collocations: "Collocations", synonyms: "Synonyms", antonyms: "Antonyms", quick: "Quick self-rating", forgot: "Forgot", hard: "Hard", mastered: "Mastered", next: "Next review", empty: "No vocabulary is available for this level yet." } : { title: "单词学习与复习", help: "根据练习结果自动安排下次复习。", noZh: "暂无中文解释", collocations: "搭配", synonyms: "同义词", antonyms: "反义词", quick: "快速自评", forgot: "忘记", hard: "困难", mastered: "熟练", next: "下次", empty: "当前级别还没有词汇内容。" };
-  return <div className="mx-auto max-w-6xl"><p className="text-sm font-bold uppercase tracking-[.2em] text-brand">Vocabulary</p><h1 className="mt-2 text-4xl font-black">{t.title}</h1><p className="mt-2 text-muted">{t.help}</p><ProfilePicker profiles={profiles} selectedId={selected?.id} pathname="/learn/vocabulary"/>{selected && <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{words.map((word) => { const progress = word.progress[0]; const meaning = word.meanings[0]?.definition ?? t.noZh; const synonyms = word.relationsFrom.filter((item) => item.type === "SYNONYM").map((item) => item.target.word); const antonyms = word.relationsFrom.filter((item) => item.type === "ANTONYM").map((item) => item.target.word); return <article className="card" key={word.id}><div className="flex items-start justify-between gap-3"><div><h2 className="text-2xl font-black">{word.word}</h2><p className="text-sm text-muted">{word.phonetic} · {word.partOfSpeech}</p></div><span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-bold text-brand">{progress?.state ?? "NEW"}</span></div><p className="mt-4">{word.definitionEn}</p>{!english && <p className="mt-2 text-muted">{meaning}</p>}{word.examples[0] && <blockquote className="mt-4 rounded-xl bg-slate-100 p-3 text-sm dark:bg-slate-800">{word.examples[0].sentence}{!english && <><br/><span className="text-muted">{word.examples[0].translation}</span></>}{word.examples[0].collocations.length > 0 && <p className="mt-2">{t.collocations}: {word.examples[0].collocations.join(", ")}</p>}</blockquote>}<p className="mt-3 text-xs text-muted">{t.synonyms}: {synonyms.join(", ") || "—"} · {t.antonyms}: {antonyms.join(", ") || "—"}</p><form action={reviewVocabulary} className="mt-5"><input type="hidden" name="profileId" value={selected.id}/><input type="hidden" name="vocabularyId" value={word.id}/><p className="label mb-2">{t.quick}</p><div className="grid grid-cols-3 gap-2"><button className="button-ghost" name="quality" value="1">{t.forgot}</button><button className="button-ghost" name="quality" value="3">{t.hard}</button><button className="button-primary" name="quality" value="5">{t.mastered}</button></div></form><VocabularyPractice profileId={selected.id} vocabularyId={word.id} word={word.word} meaning={meaning} example={word.examples[0]?.sentence} english={english}/>{progress?.nextReviewAt && <p className="mt-3 text-xs text-muted">{t.next}: {progress.nextReviewAt.toLocaleDateString(english ? "en-US" : "zh-CN")}</p>}</article>; })}</div>}{selected && !words.length && <div className="card mt-7">{t.empty}</div>}</div>;
+  const session = await auth();
+  const english = (await cookies()).get("ui_locale")?.value === "en";
+  const params = await searchParams;
+  const profiles = await getAccessibleProfiles(session!.user.id);
+  const selected = profiles.find((profile) => profile.id === params.profile) ?? profiles[0];
+  const learner = selected ? await db.learnerProfile.findUnique({ where: { id: selected.id }, select: { cefrLevel: true, dailyVocabularyGoal: true } }) : null;
+  const now = new Date();
+  const words = learner?.cefrLevel ? await db.vocabulary.findMany({
+    where: { status: "PUBLISHED", level: learner.cefrLevel, ...(selected ? { OR: [{ progress: { some: { learnerProfileId: selected.id, nextReviewAt: { lte: now } } } }, { progress: { some: { learnerProfileId: selected.id, nextReviewAt: null } } }, { progress: { none: { learnerProfileId: selected.id } } }] } : {}) },
+    include: { meanings: true, examples: true, relationsFrom: { include: { target: true } }, progress: selected ? { where: { learnerProfileId: selected.id } } : false },
+    orderBy: [{ topic: "asc" }, { word: "asc" }],
+    take: learner?.dailyVocabularyGoal ?? 10
+  }) : [];
+  const t = english
+    ? { title: "Vocabulary learning and review", help: `Today's ${learner?.dailyVocabularyGoal ?? 10}-word lesson follows your ${learner?.cefrLevel?.replace("_", "-") ?? "placement-pending"} level.`, noZh: "No Chinese explanation", empty: "No vocabulary is due for this level today." }
+    : { title: "单词学习与复习", help: `今日目标 ${learner?.dailyVocabularyGoal ?? 10} 个单词，难度跟随水平测试结果 ${learner?.cefrLevel?.replace("_", "-") ?? "待测试"}。`, noZh: "暂无中文解释", empty: "今天暂时没有该等级需要学习或复习的单词。" };
+
+  const slides = words.map((word) => {
+    const progress = word.progress[0];
+    const example = word.examples[0];
+    return {
+      id: word.id,
+      word: word.word,
+      phonetic: word.phonetic,
+      partOfSpeech: word.partOfSpeech ?? "word",
+      definitionEn: word.definitionEn,
+      meaning: word.meanings[0]?.definition ?? t.noZh,
+      topic: word.topic,
+      state: progress?.state ?? "NEW",
+      mastery: progress?.mastery ?? 0,
+      nextReview: progress?.nextReviewAt?.toLocaleDateString(english ? "en-US" : "zh-CN") ?? null,
+      example: example?.sentence ?? null,
+      translation: example?.translation ?? null,
+      collocations: example?.collocations ?? [],
+      synonyms: word.relationsFrom.filter((item) => item.type === "SYNONYM").map((item) => item.target.word),
+      antonyms: word.relationsFrom.filter((item) => item.type === "ANTONYM").map((item) => item.target.word)
+    };
+  });
+
+  return <div className="mx-auto max-w-6xl"><p className="text-sm font-bold uppercase tracking-[.2em] text-brand">Vocabulary Studio</p><h1 className="mt-2 text-4xl font-black">{t.title}</h1><p className="mt-2 text-muted">{t.help}</p>{selected && slides.length > 0 && <VocabularySlideDeck profileId={selected.id} slides={slides} english={english}/>} {selected && !slides.length && <div className="card mt-7">{t.empty}</div>}</div>;
 }

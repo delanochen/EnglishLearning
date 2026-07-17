@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 describe("NAS deployment scripts", () => {
   const deploy = readFileSync("scripts/nas-deploy.sh", "utf8");
   const restore = readFileSync("scripts/restore.sh", "utf8");
+  const autoUpdate = readFileSync("scripts/nas-auto-update.sh", "utf8");
 
   it("uses the configured published app port for readiness checks", () => {
     expect(deploy).toContain('APP_PORT="${APP_PORT:-3000}"');
@@ -36,5 +37,12 @@ describe("NAS deployment scripts", () => {
     expect(restore).toContain('CONFIRM_RESTORE:-');
     expect(restore).toContain("/backups/homelingua-[0-9]");
     expect(restore).toContain("sha256sum -c checksums.sha256");
+  });
+
+  it("auto-updates only when GitHub has a new commit and uses a deployment lock", () => {
+    expect(autoUpdate).toContain('git fetch origin main');
+    expect(autoUpdate).toContain('mkdir "$LOCK_DIR"');
+    expect(autoUpdate).toContain('scripts/nas-deploy.sh');
+    expect(autoUpdate).toContain('git status --porcelain --untracked-files=no');
   });
 });

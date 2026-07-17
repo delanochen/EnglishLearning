@@ -9,13 +9,19 @@ const base = {
   memberType: "LEARNER",
   ageBand: "ADULT",
   dailyMinutes: "30"
+  ,dailyVocabularyGoal: "15"
 };
 
 describe("memberUpdateSchema", () => {
   it("normalizes editable member input", () => {
     const parsed = memberUpdateSchema.parse(base);
     expect(parsed.dailyMinutes).toBe(30);
+    expect(parsed.dailyVocabularyGoal).toBe(15);
     expect(parsed.displayName).toBe("Alex");
+  });
+
+  it("rejects an excessive daily vocabulary goal", () => {
+    expect(() => memberUpdateSchema.parse({ ...base, dailyVocabularyGoal: "100" })).toThrow();
   });
 
   it("rejects unsupported daily study time", () => {

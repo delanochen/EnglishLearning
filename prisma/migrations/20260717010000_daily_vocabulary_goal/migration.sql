@@ -1,0 +1,2 @@
+ALTER TABLE "LearnerProfile"
+ADD COLUMN "dailyVocabularyGoal" INTEGER NOT NULL DEFAULT 10;
