@@ -1,4 +1,5 @@
 import { CefrLevel, PrismaClient, QuestionType, RoleScope } from "@prisma/client";
+import { uniqueScenarioVocabulary } from "../modules/scenario/vocabulary";
 
 const db = new PrismaClient();
 const permissions = [
@@ -174,7 +175,8 @@ async function main() {
     const timeline = [{at:0,title:"任务预演",note:"理解办理目标、角色和需要准备的信息"},{at:90,title:"说明真实需求",note:"一句话说清要办理的事情"},{at:190,title:"回答追问",note:"提供号码、时间、症状、尺寸或限制条件"},{at:310,title:"理解解决方案",note:"听取流程并确认具体处理办法"},{at:430,title:"处理意外情况",note:"询问费用、保险、延误、失败后的备用方案"},{at:560,title:"书面确认",note:"核对核心词汇、截止日期、费用和凭证"},{at:660,title:"角色挑战",note:"隐藏自己的台词完成整段对话"},{at:750,title:"理解测验",note:"用六道题检查主旨、细节和应变能力"}];
     await db.videoLesson.upsert({ where: { scenarioLessonId: lesson.id }, update: { title:`${item.category}完整任务课`,durationSeconds:840,timeline }, create: { scenarioLessonId: lesson.id, title:`${item.category}完整任务课`,durationSeconds:840,timeline } });
     await db.scenarioVocabulary.deleteMany({where:{lessonId:lesson.id}});
-    await db.scenarioVocabulary.createMany({data:[...item.words,["follow-up","后续追问"],["confirmation","确认信息"],["next step","下一步"]].map(([word,meaningZh],index)=>({lessonId:lesson.id,word,meaningZh,example:index<3?[item.need,item.question,item.solution][index]:`Could you confirm the ${word}?`,order:index+1}))});
+    const scenarioWords = uniqueScenarioVocabulary(item.words, [["follow-up","后续追问"],["confirmation","确认信息"],["next step","下一步"]]);
+    await db.scenarioVocabulary.createMany({data:scenarioWords.map(([word,meaningZh],index)=>({lessonId:lesson.id,word,meaningZh,example:index<3?[item.need,item.question,item.solution][index]:`Could you confirm the ${word}?`,order:index+1}))});
   }
   const achievements = [{ code: "FIRST_TASK", name: "迈出第一步", description: "完成第一个学习任务", icon: "🌱", metric: "TASKS", threshold: 1 }, { code: "TEN_TASKS", name: "稳定前进", description: "累计完成 10 个学习任务", icon: "⭐", metric: "TASKS", threshold: 10 }, { code: "STREAK_7", name: "一周坚持", description: "连续学习 7 天", icon: "🔥", metric: "STREAK", threshold: 7 }, { code: "XP_500", name: "成长 500", description: "累计获得 500 XP", icon: "🏅", metric: "XP", threshold: 500 }];
   for (const achievement of achievements) await db.achievement.upsert({ where: { code: achievement.code }, update: achievement, create: achievement });
