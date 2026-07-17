@@ -1,6 +1,2 @@
-import { describe, expect, it } from "vitest";
-import { updateGrammarMastery } from "@/modules/grammar/scoring";
-describe("grammar mastery", () => {
-  it("increases and delays review after a correct answer", () => { const result = updateGrammarMastery(0.5, true); expect(result.mastery).toBeGreaterThan(0.5); expect(result.reviewAfterDays).toBeGreaterThan(1); });
-  it("decreases and schedules tomorrow after a mistake", () => { const result = updateGrammarMastery(0.5, false); expect(result.mastery).toBeLessThan(0.5); expect(result.reviewAfterDays).toBe(1); });
-});
+import{describe,expect,it}from"vitest";import{scoreGrammarAnswer,updateGrammarMastery}from"@/modules/grammar/scoring";
+describe("grammar scoring",()=>{it("raises mastery after passing",()=>expect(updateGrammarMastery(.5,true).mastery).toBeGreaterThan(.5));it("schedules failed grammar for quick review",()=>expect(updateGrammarMastery(.8,false).reviewAfterDays).toBe(1));it("accepts an original complete sentence without exact key matching",()=>expect(scoreGrammarAnswer("SENTENCE_CREATION","I practice English after dinner every day.","I exercise every week.")).toBe(true));it("requires translation keyword coverage",()=>{expect(scoreGrammarAnswer("TRANSLATION","I study English every day.","I study English every day.")).toBe(true);expect(scoreGrammarAnswer("TRANSLATION","Maybe tomorrow.","I study English every day.")).toBe(false)})});

@@ -64,7 +64,7 @@ export async function updateMember(formData: FormData) {
     if (existing.learnerProfile && input.ageBand && input.dailyMinutes) {
       await tx.learnerProfile.update({
         where: { id: existing.learnerProfile.id },
-        data: { ageBand: input.ageBand, dailyMinutes: input.dailyMinutes }
+        data: { ageBand: input.ageBand, dailyMinutes: input.dailyMinutes, goals: input.goals?.split(/[，,]/).map((x) => x.trim()).filter(Boolean) ?? existing.learnerProfile.goals, interests: input.interests?.split(/[，,]/).map((x) => x.trim()).filter(Boolean) ?? existing.learnerProfile.interests, weakAreas: input.weakAreas?.split(/[，,]/).map((x) => x.trim()).filter(Boolean) ?? existing.learnerProfile.weakAreas }
       });
     }
     await tx.auditLog.create({
@@ -76,7 +76,7 @@ export async function updateMember(formData: FormData) {
         resourceId: existing.id,
         metadata: {
           before: { displayName: existing.displayName, nickname: existing.nickname, memberType: existing.memberType, ageBand: existing.learnerProfile?.ageBand, dailyMinutes: existing.learnerProfile?.dailyMinutes },
-          after: { displayName: input.displayName, nickname: input.nickname || null, memberType, ageBand: input.ageBand, dailyMinutes: input.dailyMinutes }
+          after: { displayName: input.displayName, nickname: input.nickname || null, memberType, ageBand: input.ageBand, dailyMinutes: input.dailyMinutes, goals: input.goals, interests: input.interests, weakAreas: input.weakAreas }
         }
       }
     });

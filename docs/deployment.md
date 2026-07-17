@@ -12,9 +12,9 @@ chmod +x scripts/nas-deploy.sh
 ./scripts/nas-deploy.sh
 ```
 
-## 自动周报和月度评估
+## 自动每日任务、周报和月度评估
 
-在群晖任务计划中每天凌晨运行以下命令。任务具有幂等性，同一成员同一周期只生成一次报告：
+在群晖任务计划中每天凌晨运行以下命令。任务具有幂等性：每天自动生成个性化任务，同一成员同一周期只生成一次周报或月报：
 
 ```bash
 cd /volume2/docker/EnglishLearning

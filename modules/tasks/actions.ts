@@ -5,15 +5,12 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { requireProfileAccess } from "@/modules/learner/access";
 import { updateStreak } from "@/modules/streaks/streak";
-import { planDailyTasks } from "./planner";
+import { ensureDailyTasks } from "./service";
 
 function startOfToday() { const date = new Date(); return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())); }
 
 export async function generateDailyTasks(formData: FormData) {
-  const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED"); const profileId = z.string().uuid().parse(formData.get("profileId")); await requireProfileAccess(session.user.id, profileId);
-  const [learner, mode] = await Promise.all([db.learnerProfile.findUniqueOrThrow({ where: { id: profileId } }), db.studyStreak.upsert({ where: { learnerProfileId: profileId }, update: {}, create: { learnerProfileId: profileId } })]);
-  const taskDate = startOfToday(); const existing = await db.dailyTask.count({ where: { learnerProfileId: profileId, taskDate } }); const vacation = mode.vacationUntil && mode.vacationUntil >= taskDate;
-  if (!existing && !mode.planPaused && !vacation) { const weekend = [0, 6].includes(taskDate.getUTCDay()); const minutes = weekend && mode.weekendMode ? Math.min(10, learner.dailyMinutes) : learner.dailyMinutes; await db.dailyTask.createMany({ data: planDailyTasks(minutes).map((task) => ({ learnerProfileId: profileId, taskDate, ...task, generationReason: weekend && mode.weekendMode ? "周末轻量模式" : `按每日 ${learner.dailyMinutes} 分钟目标自动生成` })) }); }
+  const session = await auth(); if (!session?.user.id) throw new Error("UNAUTHENTICATED"); const profileId = z.string().uuid().parse(formData.get("profileId")); await ensureDailyTasks(session.user.id, profileId);
   revalidatePath("/tasks");
 }
 

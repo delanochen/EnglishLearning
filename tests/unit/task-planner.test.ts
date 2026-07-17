@@ -1,11 +1,2 @@
-import { describe, expect, it } from "vitest";
-import { planDailyTasks } from "@/modules/tasks/planner";
-
-describe("planDailyTasks", () => {
-  it("keeps a short plan focused", () => expect(planDailyTasks(10)).toHaveLength(1));
-  it("creates a balanced plan for 30 minutes", () => {
-    const tasks = planDailyTasks(30);
-    expect(tasks.map((task) => task.taskType)).toEqual(["VOCABULARY", "READING", "AI_TUTOR"]);
-    expect(tasks.reduce((sum, task) => sum + task.estimatedMinutes, 0)).toBe(30);
-  });
-});
+import{describe,expect,it}from"vitest";import{planDailyTasks}from"@/modules/tasks/planner";
+describe("planDailyTasks",()=>{it("keeps a short plan focused",()=>expect(planDailyTasks(10)).toHaveLength(1));it("keeps a balanced plan within the daily minute budget",()=>{const tasks=planDailyTasks(30);expect(tasks[0].taskType).toBe("VOCABULARY");expect(tasks.reduce((sum,task)=>sum+task.estimatedMinutes,0)).toBe(30)});it("rotates through every requested learning activity over a week",()=>{const types=new Set(Array.from({length:7},(_,day)=>planDailyTasks(30,day)).flat().map(x=>x.taskType));for(const type of ["VOCABULARY","READING","LISTENING","SPEAKING","GRAMMAR","WRITING","QUIZ","AI_TUTOR"])expect(types).toContain(type)});it("prioritizes a named weak area",()=>expect(planDailyTasks(30,0,["grammar"])[1].taskType).toBe("GRAMMAR"))});

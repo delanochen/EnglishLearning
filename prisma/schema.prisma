@@ -423,6 +423,7 @@ model AIProvider {
   lastConnectionOk    Boolean?
   lastConnectionMs    Int?
   lastConnectionError String?
+  lastTestOutput      String?        @db.Text
   deletedAt           DateTime?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt

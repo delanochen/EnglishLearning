@@ -14,7 +14,8 @@ export const memberUpdateSchema = z.object({
   nickname: z.string().trim().max(60).optional(),
   memberType: z.enum(["OWNER", "PARENT", "LEARNER", "CHILD"]),
   ageBand: z.enum(["CHILD", "TEEN", "ADULT", "SENIOR"]).optional(),
-  dailyMinutes: z.coerce.number().int().min(10).max(60).optional()
+  dailyMinutes: z.coerce.number().int().min(10).max(60).optional(),
+  goals: z.string().max(500).optional(), interests: z.string().max(500).optional(), weakAreas: z.string().max(500).optional()
 });
 
 export const memberStateSchema = z.object({ familyId: z.string().uuid(), memberId: z.string().uuid() });

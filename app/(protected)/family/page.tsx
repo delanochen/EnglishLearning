@@ -64,6 +64,9 @@ export default async function FamilyPage() {
               {member.learnerProfile && <>
                 <label><span className="label">年龄段</span><select className="input" name="ageBand" defaultValue={member.learnerProfile.ageBand}><option value="CHILD">儿童</option><option value="TEEN">青少年</option><option value="ADULT">成人</option><option value="SENIOR">长者</option></select></label>
                 <label><span className="label">每日学习时间</span><select className="input" name="dailyMinutes" defaultValue={member.learnerProfile.dailyMinutes}>{dailyOptions.map((value) => <option value={value} key={value}>{value} 分钟</option>)}</select></label>
+                <label><span className="label">学习目标（逗号分隔）</span><input className="input" name="goals" defaultValue={member.learnerProfile.goals.join("，")}/></label>
+                <label><span className="label">兴趣主题（逗号分隔）</span><input className="input" name="interests" defaultValue={member.learnerProfile.interests.join("，")}/></label>
+                <label><span className="label">薄弱项目（逗号分隔）</span><input className="input" name="weakAreas" defaultValue={member.learnerProfile.weakAreas.join("，")}/></label>
               </>}
               <div className="flex items-end"><button className="button-primary w-full">保存修改</button></div>
             </form>

@@ -2,7 +2,7 @@ import { AIUsagePurpose } from "@prisma/client";
 import { db } from "@/lib/db";
 import { maskApiKey } from "@/lib/settings-crypto";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
-import { addModel, deleteProvider, saveProvider, saveRoute, testProvider, toggleProvider } from "@/modules/ai/admin-actions";
+import { addModel, deleteProvider, saveProvider, saveRoute, testProvider, testProviderGeneration, toggleProvider } from "@/modules/ai/admin-actions";
 
 const purposeLabels: Record<AIUsagePurpose, string> = {
   TUTOR: "AI 英语老师", VOCABULARY: "单词解释", READING: "阅读生成", QUIZ: "出题", GRAMMAR: "语法批改", WRITING: "写作批改",
@@ -38,6 +38,8 @@ export default async function AIAdminPage() {
     <div className="mt-6 space-y-5">{providers.map((provider) => <section className="card" key={provider.id}>
       <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-2xl font-bold">{provider.name}</h2><p className="text-sm text-muted">{provider.type} · {provider.baseUrl} · Key {maskApiKey(Boolean(provider.encryptedApiKey))}</p></div><span className={provider.enabled ? "text-brand" : "text-muted"}>{provider.enabled ? "已启用" : "已停用"}</span></div>
       <div className="mt-3 text-sm text-muted">最近测试：{provider.lastConnectionAt ? `${provider.lastConnectionOk ? "成功" : "失败"} · ${provider.lastConnectionMs}ms` : "尚未测试"}{provider.lastConnectionError ? ` · ${provider.lastConnectionError}` : ""}</div>
+      {provider.lastTestOutput && <p className="mt-2 rounded-xl bg-slate-100 p-3 text-sm dark:bg-slate-800">测试生成：{provider.lastTestOutput}</p>}
+      <form action={testProviderGeneration} className="mt-3"><input type="hidden" name="id" value={provider.id}/><button className="button-ghost">测试生成</button></form>
       <div className="mt-4 flex flex-wrap gap-2"><form action={testProvider}><input type="hidden" name="id" value={provider.id}/><button className="button-ghost">测试连接</button></form><form action={toggleProvider}><input type="hidden" name="id" value={provider.id}/><button className="button-ghost">{provider.enabled ? "停用" : "启用"}</button></form><form action={deleteProvider}><input type="hidden" name="id" value={provider.id}/><button className="button-ghost text-red-700 dark:text-red-300">删除</button></form></div>
 
       <details className="mt-5 border-t border-slate-200 pt-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold text-brand">编辑 Provider</summary><form action={saveProvider} className="mt-4 grid gap-3 md:grid-cols-2"><input type="hidden" name="providerId" value={provider.id}/><input type="hidden" name="type" value={provider.type}/><label><span className="label">名称</span><input className="input" name="name" defaultValue={provider.name}/></label><label><span className="label">Base URL</span><input className="input" name="baseUrl" defaultValue={provider.baseUrl}/></label><label><span className="label">新 API Key（留空保持原值）</span><input className="input" type="password" name="apiKey"/></label><label><span className="label">超时</span><input className="input" type="number" name="timeoutMs" defaultValue={provider.timeoutMs}/></label><label><span className="label">优先级</span><input className="input" type="number" name="priority" defaultValue={provider.priority}/></label><label><span className="label">备注</span><input className="input" name="notes" defaultValue={provider.notes ?? ""}/></label><button className="button-primary">保存修改</button></form></details>
