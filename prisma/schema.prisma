@@ -737,6 +737,12 @@ model LearningPlan {
   periodEnd        DateTime           @db.Date
   status           PlanStatus         @default(ACTIVE)
   goals            String[]
+  focusAreas       String[]             @default([])
+  recommendedCourses String[]           @default([])
+  reviewContent    String[]             @default([])
+  stageGoals       String[]             @default([])
+  monthlyEvaluation String?             @db.Text
+  adjustmentSuggestions String[]        @default([])
   generationSource String
   adjustmentReason String?
   version          Int                @default(1)
