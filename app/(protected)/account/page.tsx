@@ -1,2 +1,3 @@
+import { cookies } from "next/headers";
 import { ChangePasswordForm } from "@/components/change-password-form";
-export default function AccountPage(){return <div className="mx-auto max-w-5xl"><p className="font-bold text-brand">Account security</p><h1 className="mt-2 text-4xl font-black">账号安全</h1><p className="mt-2 text-muted">定期更换强密码；不要在聊天、日志或截图中发送密码。</p><ChangePasswordForm/></div>}
+export default async function AccountPage(){const english=(await cookies()).get("ui_locale")?.value==="en";return <div className="mx-auto max-w-5xl"><p className="font-bold text-brand">Account security</p><h1 className="mt-2 text-4xl font-black">{english?"Account security":"账号安全"}</h1><p className="mt-2 text-muted">{english?"Change to a strong password regularly. Never send passwords in chats, logs, or screenshots.":"定期更换强密码；不要在聊天、日志或截图中发送密码。"}</p><ChangePasswordForm english={english}/></div>}

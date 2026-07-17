@@ -16,6 +16,8 @@
 
 HomeLingua 默认面向家庭局域网。若需要外网访问，必须通过 HTTPS 反向代理或可信 VPN；不要暴露 PostgreSQL 或 Adminer。反向代理应覆盖 HSTS、证书续期、请求体上限和可信来源 IP 设置。
 
+Compose 的本地 secrets 由宿主机只读绑定提供。由于应用容器和 PostgreSQL 容器使用不同的非 root UID，部署脚本将 secret 文件设为 `0644`，同时把 `secrets/` 目录设为 `0700`；因此只有能够进入该目录的 NAS 管理账号才能读取文件。不要把项目目录授权给普通 NAS 用户，也不要通过 SMB 共享 `secrets/`。生产环境若使用 Docker Swarm/Kubernetes，应改用其原生 Secret 权限机制。
+
 当前 CSP 为兼容 Next.js 内联启动脚本保留 `'unsafe-inline'`。后续升级框架时可评估 nonce；这不影响 `frame-ancestors 'none'`、`object-src 'none'` 和同源 connect 等限制。
 
 内存 API 限流适用于默认单 app 容器；若扩展为多实例，需要改用 Redis 或共享数据库限流。浏览器 Web Speech API 的音频处理行为由浏览器供应商决定，敏感语音场景应关闭该能力或使用受控的本地识别服务。

@@ -2,6 +2,7 @@
 set -eu
 
 PROJECT_DIR="${PROJECT_DIR:-/volume2/docker/EnglishLearning}"
+APP_PORT="${APP_PORT:-3000}"
 cd "$PROJECT_DIR"
 for file in postgres_password auth_secret settings_encryption_key initial_admin_email initial_admin_password; do
   if [ ! -s "secrets/$file" ]; then echo "Missing or empty secret: $PROJECT_DIR/secrets/$file" >&2; exit 2; fi
@@ -20,10 +21,10 @@ docker compose config >/dev/null
 docker compose build --pull app
 docker compose up -d
 attempt=0
-until curl -fsS http://127.0.0.1:3000/api/health/ready >/dev/null 2>&1; do
+until curl -fsS "http://127.0.0.1:${APP_PORT}/api/health/ready" >/dev/null 2>&1; do
   attempt=$((attempt + 1))
   if [ "$attempt" -ge 40 ]; then echo "Health check timed out." >&2; docker compose ps -a; docker compose logs --tail=300 app postgres; exit 1; fi
   sleep 3
 done
 docker compose ps
-echo "HomeLingua is ready on port 3000."
+echo "HomeLingua is ready on port ${APP_PORT}."
