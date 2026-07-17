@@ -31,7 +31,7 @@ export default async function SpeakingPage({ searchParams }: { searchParams: Pro
     <ProfilePicker profiles={profiles} selectedId={selected?.id} pathname="/learn/speaking"/>
     {selected && <div className="mt-5 flex flex-wrap gap-2">{modes.map((mode) => <Link className={mode.id === practice.id ? "button-primary" : "button-ghost"} href={`/learn/speaking?profile=${selected.id}&mode=${mode.id}`} key={mode.id}>{english ? mode.en : mode.zh}</Link>)}</div>}
     {selected && <>
-      <section className="card mt-7"><p className="label">{english ? practice.en : practice.zh}</p><h2 className="mt-2 text-2xl font-black">{practice.prompt}</h2>{practice.id === "FREE_CONVERSATION" && <p className="mt-2 text-muted">{t.freeHelp}</p>}<div className="mt-5"><SpeakingRecorder profileId={selected.id} prompt={practice.prompt} mode={practice.id}/></div></section>
+      <section className="card mt-7"><p className="label">{english ? practice.en : practice.zh}</p><h2 className="mt-2 text-2xl font-black">{practice.prompt}</h2>{practice.id === "FREE_CONVERSATION" && <p className="mt-2 text-muted">{t.freeHelp}</p>}<div className="mt-5"><SpeakingRecorder profileId={selected.id} prompt={practice.prompt} mode={practice.id} english={english}/></div></section>
       <section className="mt-7"><h2 className="text-2xl font-black">{t.history}</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-3"><TrendMetric label={t.recent} value={trend.recentAverage}/><TrendMetric label={t.prior} value={trend.previousAverage}/><TrendMetric label={t.improvement} value={trend.delta} signed/></div>
         {trend.delta == null && <p className="mt-2 text-sm text-muted">{t.needHistory}</p>}
