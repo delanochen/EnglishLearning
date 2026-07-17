@@ -24,6 +24,7 @@ services:
 
   app:
     build: .
+    image: homelingua-app
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
@@ -50,6 +51,20 @@ services:
       retries: 5
       start_period: 60s
     logging: *logging
+    networks: [internal]
+
+  reports:
+    image: homelingua-app
+    profiles: [operations]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-homelingua}
+      POSTGRES_USER: ${POSTGRES_USER:-homelingua}
+    secrets: [postgres_password]
+    entrypoint: ["/app/scripts/run-reports.sh"]
     networks: [internal]
 
   adminer:

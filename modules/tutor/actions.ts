@@ -49,3 +49,5 @@ export async function toggleMessageReview(formData: FormData) {
   await db.aIMessage.update({ where: { id }, data: { savedForReview: !message.savedForReview } });
   revalidatePath("/learn/tutor");
 }
+
+export async function archiveConversation(formData:FormData){const session=await auth();if(!session?.user.id)throw new Error("UNAUTHENTICATED");const id=z.string().uuid().parse(formData.get("conversationId"));const conversation=await db.aIConversation.findUniqueOrThrow({where:{id}});await requireProfileAccess(session.user.id,conversation.learnerProfileId);await db.aIConversation.update({where:{id},data:{status:"ARCHIVED"}});revalidatePath("/learn/tutor")}

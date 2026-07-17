@@ -12,6 +12,15 @@ chmod +x scripts/nas-deploy.sh
 ./scripts/nas-deploy.sh
 ```
 
+## 自动周报和月度评估
+
+在群晖任务计划中每天凌晨运行以下命令。任务具有幂等性，同一成员同一周期只生成一次报告：
+
+```bash
+cd /volume2/docker/EnglishLearning
+/usr/local/bin/docker compose --profile operations run --rm reports >> logs/reports.log 2>&1
+```
+
 ## 持久化边界
 
 项目使用以下宿主目录：`data/postgres`、`uploads`、`logs`、`backups` 和 `secrets`。`settings_encryption_key` 必须单独离线保存；缺少原密钥将无法解密已有 AI Provider Key。

@@ -64,8 +64,10 @@ export async function routedChat(purpose: AIUsagePurpose, input: Omit<ChatInput,
 export async function routedStructured<T>(purpose: AIUsagePurpose, input: Omit<StructuredInput<T>, "model">, userId?: string) {
   const first = await routedChat(purpose, { ...input, messages: [...input.messages, { role: "system", content: `Return only JSON for schema ${input.schemaName}.` }] }, userId);
   try { return input.schema.parse(JSON.parse(first.text)); }
-  catch {
+  catch (error) {
+    await db.auditLog.create({ data: { actorUserId: userId, action: "AI_STRUCTURED_VALIDATION_RETRY", resourceType: "AISchema", resourceId: input.schemaName, metadata: { error: error instanceof Error ? error.name : "VALIDATION_ERROR" } } });
     const retry = await routedChat(purpose, { ...input, messages: [...input.messages, { role: "system", content: `Your previous response was invalid. Return only valid JSON matching ${input.schemaName}.` }] }, userId);
-    return input.schema.parse(JSON.parse(retry.text));
+    try { return input.schema.parse(JSON.parse(retry.text)); }
+    catch (retryError) { await db.auditLog.create({ data: { actorUserId: userId, action: "AI_STRUCTURED_VALIDATION_FAILED", resourceType: "AISchema", resourceId: input.schemaName, metadata: { error: retryError instanceof Error ? retryError.name : "VALIDATION_ERROR" } } }); throw retryError; }
   }
 }
