@@ -16,7 +16,7 @@ export default async function Dashboard() {
     db.learningActivity.findMany({ where: { learnerProfileId: selected.id, occurredAt: { gte: todayStart } }, orderBy: { occurredAt: "desc" } }),
     db.dailyTask.findMany({ where: { learnerProfileId: selected.id, taskDate: todayStart } }),
     db.userVocabularyProgress.findMany({ where: { learnerProfileId: selected.id }, take: 5, orderBy: { updatedAt: "desc" }, include: { vocabulary: true } }),
-    db.grammarAttempt.findMany({ where: { progress: { learnerProfileId: selected.id }, isCorrect: false }, take: 5, orderBy: { createdAt: "desc" }, include: { exercise: { include: { topic: true } } } }),
+    db.mistakeRecord.findMany({ where: { learnerProfileId: selected.id, status: "OPEN" }, take: 5, orderBy: { updatedAt: "desc" } }),
   ]) : [null, [], [], [], []];
   const minutes = Math.round(activities.reduce((sum, activity) => sum + activity.durationSeconds, 0) / 60);
   const completed = tasks.filter((task) => task.status === "COMPLETED").length;
@@ -40,7 +40,7 @@ export default async function Dashboard() {
     </section>
     <section className="mt-5 grid gap-5 lg:grid-cols-2">
       <div className="card"><h2 className="text-xl font-black">{t.recentWords}</h2>{recentWords.map((item) => <p className="mt-2" key={item.id}><strong>{item.vocabulary.word}</strong> · {Math.round(item.mastery * 100)}% · {item.state}</p>)}{!recentWords.length && <p className="mt-2 text-muted">{t.noWords}</p>}</div>
-      <div className="card"><h2 className="text-xl font-black">{t.recentMistakes}</h2>{mistakes.map((item) => <p className="mt-2" key={item.id}><strong>{item.exercise.topic.title}</strong> · {item.exercise.prompt}</p>)}{!mistakes.length && <p className="mt-2 text-muted">{t.noMistakes}</p>}</div>
+      <div className="card"><h2 className="text-xl font-black">{t.recentMistakes}</h2>{mistakes.map((item) => <details className="mt-2 rounded-xl border p-3" key={item.id}><summary className="cursor-pointer"><strong>{item.module}</strong> · {item.prompt}</summary><p className="mt-2 text-sm text-muted">{english ? "Your answer" : "你的答案"}：{item.answer || "—"}</p><p className="mt-1 text-sm">{english ? "Correct answer" : "正确答案"}：{item.correctAnswer}</p>{item.explanation && <p className="mt-1 text-sm text-muted">{item.explanation}</p>}</details>)}{!mistakes.length && <p className="mt-2 text-muted">{t.noMistakes}</p>}</div>
     </section>
     <div className="mt-5 flex gap-3"><Link href={selected ? `/plans?profile=${selected.id}` : "/family"} className="button-ghost">{t.plan}</Link><Link href={selected ? `/reports?profile=${selected.id}` : "/family"} className="button-ghost">{t.report}</Link><Link href="/family-dashboard" className="button-ghost">{t.family}</Link></div>
   </div>;

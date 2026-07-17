@@ -313,6 +313,31 @@ model LearnerProfile {
   achievements       UserAchievement[]
   notifications      Notification[]
   uploadedFiles      UploadedFile[]
+  mistakes           MistakeRecord[]
+}
+
+model MistakeRecord {
+  id               String         @id @default(uuid()) @db.Uuid
+  learnerProfileId String         @db.Uuid
+  familyId         String         @db.Uuid
+  module           String
+  sourceType       String
+  sourceId         String         @db.Uuid
+  questionId       String         @db.Uuid
+  prompt           String         @db.Text
+  answer           String?        @db.Text
+  correctAnswer    String         @db.Text
+  explanation      String?        @db.Text
+  status           String         @default("OPEN")
+  attemptCount     Int            @default(1)
+  correctedAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([learnerProfileId, module, questionId])
+  @@index([learnerProfileId, status, updatedAt])
+  @@index([familyId, status, updatedAt])
 }
 
 model Role {
