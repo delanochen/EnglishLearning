@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { VocabularySlideDeck } from "@/components/vocabulary-slide-deck";
+import { VocabularyGame } from "@/components/vocabulary-game";
 import { getAccessibleProfiles } from "@/modules/learner/access";
 import { getActiveProfile } from "@/modules/learner/selection";
 
@@ -43,5 +44,5 @@ export default async function VocabularyPage() {
     };
   });
 
-  return <div className="mx-auto max-w-6xl"><p className="text-sm font-bold uppercase tracking-[.2em] text-brand">Vocabulary Studio</p><h1 className="mt-2 text-4xl font-black">{t.title}</h1><p className="mt-2 text-muted">{t.help}</p>{selected && slides.length > 0 && <VocabularySlideDeck profileId={selected.id} slides={slides} english={english}/>} {selected && !slides.length && <div className="card mt-7">{t.empty}</div>}</div>;
+  return <div className="mx-auto max-w-6xl"><p className="text-sm font-bold uppercase tracking-[.2em] text-brand">Vocabulary Studio</p><h1 className="mt-2 text-4xl font-black">{t.title}</h1><p className="mt-2 text-muted">{t.help}</p>{selected && slides.length > 0 && <><VocabularyGame profileId={selected.id} slides={slides} english={english}/><details className="mt-6"><summary className="cursor-pointer text-lg font-black text-brand">{english?"Open PPT learning deck":"打开 PPT 单词学习卡"}</summary><VocabularySlideDeck profileId={selected.id} slides={slides} english={english}/></details></>} {selected && !slides.length && <div className="card mt-7">{t.empty}</div>}</div>;
 }

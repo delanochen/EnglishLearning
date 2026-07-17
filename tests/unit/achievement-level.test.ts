@@ -3,9 +3,9 @@ import { achievementCatalog } from "@/modules/achievements/catalog";
 import { xpLevel } from "@/modules/achievements/level";
 
 describe("achievement system",()=>{
-  it("ships twenty unique bilingual badges with rewards",()=>{
-    expect(achievementCatalog).toHaveLength(20);
-    expect(new Set(achievementCatalog.map(item=>item.code)).size).toBe(20);
+  it("ships at least twenty unique bilingual badges with rewards",()=>{
+    expect(achievementCatalog.length).toBeGreaterThanOrEqual(20);
+    expect(new Set(achievementCatalog.map(item=>item.code)).size).toBe(achievementCatalog.length);
     expect(achievementCatalog.every(item=>item.nameEn&&item.descriptionEn&&item.rewardXp>0)).toBe(true);
   });
   it("calculates growth level progress",()=>{

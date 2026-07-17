@@ -317,6 +317,7 @@ model LearnerProfile {
   notifications      Notification[]
   uploadedFiles      UploadedFile[]
   mistakes           MistakeRecord[]
+  vocabularyGames    VocabularyGameSession[]
 }
 
 model MistakeRecord {
@@ -586,6 +587,7 @@ model Vocabulary {
   progress      UserVocabularyProgress[]
   relationsFrom VocabularyRelation[]     @relation("VocabularyRelationSource")
   relationsTo   VocabularyRelation[]     @relation("VocabularyRelationTarget")
+  gameAnswers   VocabularyGameAnswer[]
 
   @@unique([word, partOfSpeech])
   @@index([level, topic, status])
@@ -663,6 +665,38 @@ model ReviewSchedule {
   progress    UserVocabularyProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
 
   @@index([scheduledAt, completedAt])
+}
+
+model VocabularyGameSession {
+  id               String                 @id @default(uuid()) @db.Uuid
+  learnerProfileId String                 @db.Uuid
+  mode             String
+  periodStart      DateTime               @db.Date
+  totalQuestions   Int
+  correctAnswers   Int
+  maxStreak        Int
+  score            Int
+  earnedXp         Int
+  completedAt      DateTime               @default(now())
+  learnerProfile   LearnerProfile         @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  answers          VocabularyGameAnswer[]
+
+  @@index([learnerProfileId, mode, periodStart])
+}
+
+model VocabularyGameAnswer {
+  id           String                @id @default(uuid()) @db.Uuid
+  sessionId    String                @db.Uuid
+  vocabularyId String                @db.Uuid
+  questionType String
+  answer       String
+  isCorrect    Boolean
+  responseMs   Int                   @default(0)
+  session      VocabularyGameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  vocabulary   Vocabulary            @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([vocabularyId, isCorrect])
 }
 
 model ReadingArticle {

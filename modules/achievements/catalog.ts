@@ -19,4 +19,6 @@ export const achievementCatalog = [
   { code:"SCENARIO_10",name:"美国生活通",nameEn:"US Life Navigator",description:"完成 10 个美国生活场景",descriptionEn:"Complete 10 US-life scenarios",icon:"🏙️",category:"SCENARIO",metric:"SCENARIOS",threshold:10,rewardXp:150 },
   { code:"MODULES_5",name:"全面发展",nameEn:"All-round Learner",description:"体验 5 种不同学习模块",descriptionEn:"Practice in 5 different modules",icon:"🌈",category:"EXPLORATION",metric:"MODULES",threshold:5,rewardXp:60 },
   { code:"HIGH_SCORE_10",name:"精准学习者",nameEn:"Accuracy Ace",description:"完成 10 次正确率不低于 80% 的练习",descriptionEn:"Complete 10 activities at 80% accuracy or higher",icon:"🎯",category:"MASTERY",metric:"HIGH_SCORE",threshold:10,rewardXp:100 },
+  { code:"WORD_STREAK_5",name:"单词五连击",nameEn:"Word Combo Five",description:"在单词闯关中达到 5 连击",descriptionEn:"Reach a five-answer streak in Vocabulary Quest",icon:"⚡",category:"VOCABULARY",metric:"GAME_STREAK",threshold:5,rewardXp:30 },
+  { code:"WEEKLY_PERFECT",name:"周考满分",nameEn:"Perfect Weekly Exam",description:"在本周词汇考试中获得满分",descriptionEn:"Get a perfect score in a weekly vocabulary exam",icon:"💯",category:"VOCABULARY",metric:"PERFECT_WEEKLY",threshold:1,rewardXp:80 },
 ] as const;
