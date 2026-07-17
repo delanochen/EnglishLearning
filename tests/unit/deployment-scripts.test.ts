@@ -27,6 +27,11 @@ describe("NAS deployment scripts", () => {
     expect(backup.indexOf('mv "$WORK" "$FINAL"')).toBeLessThan(backup.indexOf('chown -R 1001:1001 "$FINAL"'));
   });
 
+  it("excludes an accidental nested repository from Docker and TypeScript builds", () => {
+    expect(readFileSync(".dockerignore", "utf8")).toContain("/EnglishLearning");
+    expect(JSON.parse(readFileSync("tsconfig.json", "utf8")).exclude).toContain("EnglishLearning");
+  });
+
   it("requires explicit confirmation and a direct timestamped backup path", () => {
     expect(restore).toContain('CONFIRM_RESTORE:-');
     expect(restore).toContain("/backups/homelingua-[0-9]");

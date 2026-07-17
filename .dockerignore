@@ -9,3 +9,4 @@ secrets
 docs
 tests
 *.log
+/EnglishLearning
