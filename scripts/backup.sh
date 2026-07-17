@@ -19,6 +19,7 @@ tar -czf "$WORK/uploads.tar.gz" -C "$SOURCE_ROOT" uploads
 printf '%s\n' "version=${APP_VERSION:-unknown}" "created_at=${STAMP}" "database=${PGDATABASE}" > "$WORK/manifest.txt"
 (cd "$WORK" && sha256sum database.dump settings.dump uploads.tar.gz manifest.txt > checksums.sha256)
 mv "$WORK" "$FINAL"
+if [ "$(id -u)" = "0" ]; then chown -R 1001:1001 "$FINAL"; fi
 psql --set=ON_ERROR_STOP=1 --set=resource="$FINAL" <<'SQL'
 INSERT INTO "AuditLog" ("id", "action", "resourceType", "resourceId", "metadata", "createdAt")
 VALUES (gen_random_uuid(), 'BACKUP_CREATED', 'Backup', :'resource', jsonb_build_object('source', 'operations-container'), now());

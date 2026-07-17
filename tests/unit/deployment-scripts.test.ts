@@ -22,6 +22,11 @@ describe("NAS deployment scripts", () => {
     }
   });
 
+  it("hands root-created backups back to the non-root application user", () => {
+    const backup = readFileSync("scripts/backup.sh", "utf8");
+    expect(backup.indexOf('mv "$WORK" "$FINAL"')).toBeLessThan(backup.indexOf('chown -R 1001:1001 "$FINAL"'));
+  });
+
   it("requires explicit confirmation and a direct timestamped backup path", () => {
     expect(restore).toContain('CONFIRM_RESTORE:-');
     expect(restore).toContain("/backups/homelingua-[0-9]");
