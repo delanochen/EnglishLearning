@@ -1,4 +1,68 @@
-import{PrismaClient}from"@prisma/client";const db=new PrismaClient();
-function start(type:"WEEKLY"|"MONTHLY",now=new Date()){const d=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));if(type==="MONTHLY")d.setUTCDate(1);else{const day=d.getUTCDay();d.setUTCDate(d.getUTCDate()-(day===0?6:day-1))}return d}
-async function generate(profileId:string,type:"WEEKLY"|"MONTHLY"){const periodStart=start(type);const existing=type==="WEEKLY"?await db.weeklyReport.findFirst({where:{learnerProfileId:profileId,periodStart}}):await db.monthlyReport.findFirst({where:{learnerProfileId:profileId,periodStart}});if(existing)return false;const now=new Date();const[activities,assigned,completed]=await Promise.all([db.learningActivity.findMany({where:{learnerProfileId:profileId,occurredAt:{gte:periodStart}},select:{module:true,durationSeconds:true,score:true}}),db.dailyTask.count({where:{learnerProfileId:profileId,taskDate:{gte:periodStart,lte:now}}}),db.dailyTask.count({where:{learnerProfileId:profileId,taskDate:{gte:periodStart,lte:now},status:"COMPLETED"}})]);const scored=activities.flatMap(x=>x.score==null?[]:[x.score]);const moduleCounts=activities.reduce<Record<string,number>>((acc,x)=>(acc[x.module]=(acc[x.module]??0)+1,acc),{});const strongestModule=Object.entries(moduleCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]??null;const metrics={durationMinutes:Math.round(activities.reduce((s,x)=>s+x.durationSeconds,0)/60),completionRate:assigned?Math.round(completed/assigned*100):0,averageScore:scored.length?Math.round(scored.reduce((a,b)=>a+b,0)/scored.length*100):null,activityCount:activities.length,strongestModule};const strengths=strongestModule?[`${strongestModule} 参与度最高`]:["已建立学习档案"];const weakAreas=metrics.completionRate<60?["任务完成率需要提高"]:[];const recommendations=activities.length?["继续保持每日短时学习","优先复习错题和到期单词"]:["先完成一项每日任务"];if(type==="WEEKLY")await db.weeklyReport.create({data:{learnerProfileId:profileId,periodStart,periodEnd:now,metrics,strengths,weakAreas,recommendations}});else await db.monthlyReport.create({data:{learnerProfileId:profileId,periodStart,periodEnd:now,metrics,strengths,weakAreas,recommendations}});await db.notification.create({data:{learnerProfileId:profileId,type:`${type}_REPORT_READY`,title:type==="WEEKLY"?"本周学习报告已生成":"本月学习评估已生成",body:"查看学习时长、完成率、优势、薄弱项和下一阶段建议。"}});return true}
-async function main(){const profiles=await db.learnerProfile.findMany({select:{id:true}});let created=0;for(const profile of profiles){if(await generate(profile.id,"WEEKLY"))created++;if(await generate(profile.id,"MONTHLY"))created++}console.log(`Generated ${created} due reports for ${profiles.length} profiles.`)}main().finally(()=>db.$disconnect());
+import { PrismaClient } from "@prisma/client";
+import { summarizeActivities } from "../modules/reports/metrics";
+import { reportInsights, reportPeriod, type ReportType } from "../modules/reports/period";
+
+const db = new PrismaClient();
+
+async function generate(profileId: string, type: ReportType) {
+  const { start, end } = reportPeriod(type);
+  const [activities, assigned, completed] = await Promise.all([
+    db.learningActivity.findMany({
+      where: { learnerProfileId: profileId, occurredAt: { gte: start } },
+      select: { module: true, durationSeconds: true, score: true },
+    }),
+    db.dailyTask.count({ where: { learnerProfileId: profileId, taskDate: { gte: start, lte: end } } }),
+    db.dailyTask.count({ where: { learnerProfileId: profileId, taskDate: { gte: start, lte: end }, status: "COMPLETED" } }),
+  ]);
+  const metrics = summarizeActivities(activities, assigned, completed);
+  const insights = reportInsights(metrics);
+  const common = { periodEnd: end, metrics, ...insights, generatedAt: new Date() };
+
+  if (type === "WEEKLY") {
+    const existing = await db.weeklyReport.findFirst({
+      where: { learnerProfileId: profileId, periodStart: start, generationType: "AUTOMATED" },
+    });
+    if (existing) {
+      await db.weeklyReport.update({ where: { id: existing.id }, data: common });
+      return "updated";
+    }
+    const version = await db.weeklyReport.count({ where: { learnerProfileId: profileId, periodStart: start } }) + 1;
+    await db.weeklyReport.create({ data: { learnerProfileId: profileId, periodStart: start, version, generationType: "AUTOMATED", ...common } });
+  } else {
+    const existing = await db.monthlyReport.findFirst({
+      where: { learnerProfileId: profileId, periodStart: start, generationType: "AUTOMATED" },
+    });
+    if (existing) {
+      await db.monthlyReport.update({ where: { id: existing.id }, data: common });
+      return "updated";
+    }
+    const version = await db.monthlyReport.count({ where: { learnerProfileId: profileId, periodStart: start } }) + 1;
+    await db.monthlyReport.create({ data: { learnerProfileId: profileId, periodStart: start, version, generationType: "AUTOMATED", ...common } });
+  }
+
+  await db.notification.create({
+    data: {
+      learnerProfileId: profileId,
+      type: `${type}_REPORT_READY`,
+      title: type === "WEEKLY" ? "本周学习报告已生成" : "本月学习评估已生成",
+      body: "查看学习时长、完成率、优势、薄弱项和下一阶段建议。",
+    },
+  });
+  return "created";
+}
+
+async function main() {
+  const profiles = await db.learnerProfile.findMany({ select: { id: true } });
+  let created = 0;
+  let updated = 0;
+  for (const profile of profiles) {
+    for (const type of ["WEEKLY", "MONTHLY"] as const) {
+      const result = await generate(profile.id, type);
+      if (result === "created") created++;
+      else updated++;
+    }
+  }
+  console.log(`Reports refreshed for ${profiles.length} profiles: ${created} created, ${updated} updated.`);
+}
+
+main().finally(() => db.$disconnect());

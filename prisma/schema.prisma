@@ -856,9 +856,11 @@ model WeeklyReport {
   recommendations  String[]
   generatedAt      DateTime       @default(now())
   version          Int            @default(1)
+  generationType   String         @default("MANUAL")
   learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
 
   @@unique([learnerProfileId, periodStart, version])
+  @@index([learnerProfileId, generationType, periodStart])
 }
 
 model MonthlyReport {
@@ -872,9 +874,11 @@ model MonthlyReport {
   recommendations  String[]
   generatedAt      DateTime       @default(now())
   version          Int            @default(1)
+  generationType   String         @default("MANUAL")
   learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
 
   @@unique([learnerProfileId, periodStart, version])
+  @@index([learnerProfileId, generationType, periodStart])
 }
 
 model ScenarioLesson {
