@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentEditSchema, csv, listeningContentSchema, readingContentSchema, scenarioExerciseSchema, scenarioPublishReadiness } from "@/modules/admin/content-schemas";
+import { contentEditSchema, csv, grammarPublishReadiness, listeningContentSchema, parseContrastLines, readingContentSchema, scenarioExerciseSchema, scenarioPublishReadiness } from "@/modules/admin/content-schemas";
 
 describe("admin content schemas", () => {
   it("normalizes target lists for manually authored reading lessons", () => {
@@ -22,5 +22,10 @@ describe("admin content schemas", () => {
 
   it("validates scenario multiple-choice authoring input", () => {
     expect(scenarioExerciseSchema.parse({ lessonId: "11111111-1111-4111-8111-111111111111", prompt: "What happens next?", answerKey: "Call the office", options: "Wait\nCall the office" }).answerKey).toBe("Call the office");
+  });
+  it("parses grammar contrasts and blocks incomplete grammar publishing", () => {
+    expect(parseContrastLines("She works. | She work. | Add -s after she.")).toEqual([{ correct: "She works.", incorrect: "She work.", note: "Add -s after she." }]);
+    expect(grammarPublishReadiness({ examples: 1, exercises: 2, useCases: 0, commonErrors: 0 })).toHaveLength(4);
+    expect(grammarPublishReadiness({ examples: 2, exercises: 3, useCases: 1, commonErrors: 1 })).toEqual([]);
   });
 });

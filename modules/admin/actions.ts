@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
-import { contentEditSchema, listeningContentSchema, readingContentSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, csv, lines } from "./content-schemas";
+import { contentEditSchema, grammarExampleSchema, grammarExerciseSchema, grammarMetadataSchema, grammarPublishReadiness, listeningContentSchema, parseContrastLines, readingContentSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, csv, lines } from "./content-schemas";
 
 async function audit(actorUserId: string, action: string, resourceType: string, resourceId: string, metadata?: object) {
   await db.auditLog.create({ data: { actorUserId, action, resourceType, resourceId, metadata } });
@@ -27,7 +27,14 @@ export async function updateContentStatus(formData: FormData) {
   const actor = await requireSystemAdmin(); const input = contentInput.parse(Object.fromEntries(formData));
   if (input.type === "vocabulary") await db.vocabulary.update({ where: { id: input.id }, data: { status: input.status } });
   if (input.type === "reading") await db.readingArticle.update({ where: { id: input.id }, data: { status: input.status } });
-  if (input.type === "grammar") await db.grammarTopic.update({ where: { id: input.id }, data: { status: input.status } });
+  if (input.type === "grammar") {
+    if (input.status === "PUBLISHED") {
+      const topic = await db.grammarTopic.findUniqueOrThrow({ where: { id: input.id }, include: { _count: { select: { examples: true, exercises: true } } } });
+      const missing = grammarPublishReadiness({ ...topic._count, useCases: topic.useCases.length, commonErrors: topic.commonErrors.length });
+      if (missing.length) throw new Error(`GRAMMAR_NOT_READY:${missing.join("；")}`);
+    }
+    await db.grammarTopic.update({ where: { id: input.id }, data: { status: input.status } });
+  }
   if (input.type === "scenario") {
     if (input.status === "PUBLISHED") {
       const lesson = await db.scenarioLesson.findUniqueOrThrow({ where: { id: input.id }, include: { _count: { select: { dialogues: true, vocabulary: true, exercises: true } } } });
@@ -120,5 +127,29 @@ export async function deleteScenarioItem(formData: FormData) {
   if (input.type === "vocabulary") await db.scenarioVocabulary.deleteMany({ where: { id: input.id, lessonId: input.lessonId } });
   if (input.type === "exercise") await db.scenarioExercise.deleteMany({ where: { id: input.id, lessonId: input.lessonId } });
   await audit(actor.id, "SCENARIO_ITEM_DELETED", input.type, input.id, { lessonId: input.lessonId }); revalidatePath(`/admin/content/scenarios/${input.lessonId}`);
+}
+
+export async function updateGrammarMetadata(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = grammarMetadataSchema.parse(Object.fromEntries(formData));
+  await db.grammarTopic.update({ where: { id: input.topicId }, data: { slug: input.slug, title: input.title, ruleEn: input.ruleEn, ruleZh: input.ruleZh, level: input.level, useCases: lines(input.useCases), commonErrors: lines(input.commonErrors), contrastExamples: parseContrastLines(input.contrastExamples) } });
+  await audit(actor.id, "GRAMMAR_METADATA_UPDATED", "GrammarTopic", input.topicId); revalidatePath(`/admin/content/grammar/${input.topicId}`); revalidatePath("/admin/content");
+}
+export async function addGrammarExample(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = grammarExampleSchema.parse(Object.fromEntries(formData));
+  const row = await db.grammarExample.create({ data: { topicId: input.topicId, sentence: input.sentence, translation: input.translation || null, explanation: input.explanation || null, isError: input.isError === "on" } });
+  await audit(actor.id, "GRAMMAR_EXAMPLE_ADDED", "GrammarExample", row.id, { topicId: input.topicId }); revalidatePath(`/admin/content/grammar/${input.topicId}`);
+}
+export async function addGrammarExercise(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = grammarExerciseSchema.parse(Object.fromEntries(formData)); const options = lines(input.options);
+  if (input.type === "MULTIPLE_CHOICE" && (options.length < 2 || !options.includes(input.answerKey))) throw new Error("GRAMMAR_OPTIONS_INVALID");
+  const last = await db.grammarExercise.aggregate({ where: { topicId: input.topicId }, _max: { order: true } });
+  const row = await db.grammarExercise.create({ data: { topicId: input.topicId, order: (last._max.order ?? 0) + 1, type: input.type, prompt: input.prompt, options: options.length ? options : undefined, answerKey: input.answerKey, explanation: input.explanation || null } });
+  await audit(actor.id, "GRAMMAR_EXERCISE_ADDED", "GrammarExercise", row.id, { topicId: input.topicId }); revalidatePath(`/admin/content/grammar/${input.topicId}`);
+}
+export async function deleteGrammarItem(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = z.object({ topicId: z.string().uuid(), id: z.string().uuid(), type: z.enum(["example", "exercise"]) }).parse(Object.fromEntries(formData));
+  if (input.type === "example") await db.grammarExample.deleteMany({ where: { id: input.id, topicId: input.topicId } });
+  else await db.grammarExercise.deleteMany({ where: { id: input.id, topicId: input.topicId } });
+  await audit(actor.id, "GRAMMAR_ITEM_DELETED", input.type, input.id, { topicId: input.topicId }); revalidatePath(`/admin/content/grammar/${input.topicId}`);
 }
 export async function archiveUploadedFile(formData:FormData){const actor=await requireSystemAdmin();const id=z.string().uuid().parse(formData.get("id"));await db.uploadedFile.update({where:{id},data:{status:"ARCHIVED",deletedAt:new Date()}});await audit(actor.id,"FILE_ARCHIVED","UploadedFile",id);revalidatePath("/admin/files")}

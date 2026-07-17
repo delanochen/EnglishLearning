@@ -46,7 +46,16 @@ export const scenarioExerciseSchema = z.object({
   options: z.string().max(5000), explanation: z.string().trim().max(2000).optional(),
 });
 
+export const grammarMetadataSchema = z.object({
+  topicId: z.string().uuid(), slug: z.string().trim().min(1).max(80).regex(/^[a-z0-9-]+$/), title: z.string().trim().min(1).max(160),
+  ruleEn: z.string().trim().min(10).max(5000), ruleZh: z.string().trim().min(5).max(5000), level: cefrSchema,
+  useCases: z.string().max(5000), commonErrors: z.string().max(5000), contrastExamples: z.string().max(10_000),
+});
+export const grammarExampleSchema = z.object({ topicId: z.string().uuid(), sentence: z.string().trim().min(2).max(2000), translation: z.string().trim().max(2000).optional(), explanation: z.string().trim().max(2000).optional(), isError: z.string().optional() });
+export const grammarExerciseSchema = z.object({ topicId: z.string().uuid(), type: z.enum(["MULTIPLE_CHOICE", "FILL_BLANK", "ERROR_CORRECTION", "REORDER", "TRANSLATION", "SENTENCE_CREATION", "AI_DIALOGUE"]), prompt: z.string().trim().min(2).max(2000), options: z.string().max(5000), answerKey: z.string().trim().min(1).max(2000), explanation: z.string().trim().max(2000).optional() });
+
 export function lines(value = "") { return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
+export function parseContrastLines(value = "") { return lines(value).map((line) => { const [correct = "", incorrect = "", note = ""] = line.split("|").map((item) => item.trim()); return { correct, incorrect, note }; }).filter((item) => item.correct && item.incorrect); }
 export function scenarioPublishReadiness(counts: { dialogues: number; vocabulary: number; exercises: number; cultureTips: number; naturalExpressions: number }) {
   const missing: string[] = [];
   if (counts.dialogues < 8) missing.push("至少 8 句对话");
@@ -54,6 +63,14 @@ export function scenarioPublishReadiness(counts: { dialogues: number; vocabulary
   if (counts.exercises < 3) missing.push("至少 3 道练习题");
   if (counts.cultureTips < 1) missing.push("至少 1 条文化提示");
   if (counts.naturalExpressions < 2) missing.push("至少 2 条自然表达");
+  return missing;
+}
+export function grammarPublishReadiness(counts: { examples: number; exercises: number; useCases: number; commonErrors: number }) {
+  const missing: string[] = [];
+  if (counts.examples < 2) missing.push("至少 2 个正误例句");
+  if (counts.exercises < 3) missing.push("至少 3 道练习题");
+  if (counts.useCases < 1) missing.push("至少 1 个适用场景");
+  if (counts.commonErrors < 1) missing.push("至少 1 条常见错误");
   return missing;
 }
 
