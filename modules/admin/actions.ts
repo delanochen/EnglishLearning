@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
-import { contentEditSchema, listeningContentSchema, readingContentSchema, csv } from "./content-schemas";
+import { contentEditSchema, listeningContentSchema, readingContentSchema, scenarioDialogueSchema, scenarioExerciseSchema, scenarioMetadataSchema, scenarioPublishReadiness, scenarioVocabularySchema, csv, lines } from "./content-schemas";
 
 async function audit(actorUserId: string, action: string, resourceType: string, resourceId: string, metadata?: object) {
   await db.auditLog.create({ data: { actorUserId, action, resourceType, resourceId, metadata } });
@@ -28,7 +28,14 @@ export async function updateContentStatus(formData: FormData) {
   if (input.type === "vocabulary") await db.vocabulary.update({ where: { id: input.id }, data: { status: input.status } });
   if (input.type === "reading") await db.readingArticle.update({ where: { id: input.id }, data: { status: input.status } });
   if (input.type === "grammar") await db.grammarTopic.update({ where: { id: input.id }, data: { status: input.status } });
-  if (input.type === "scenario") await db.scenarioLesson.update({ where: { id: input.id }, data: { status: input.status } });
+  if (input.type === "scenario") {
+    if (input.status === "PUBLISHED") {
+      const lesson = await db.scenarioLesson.findUniqueOrThrow({ where: { id: input.id }, include: { _count: { select: { dialogues: true, vocabulary: true, exercises: true } } } });
+      const missing = scenarioPublishReadiness({ ...lesson._count, cultureTips: lesson.cultureTips.length, naturalExpressions: lesson.naturalExpressions.length });
+      if (missing.length) throw new Error(`SCENARIO_NOT_READY:${missing.join("；")}`);
+    }
+    await db.scenarioLesson.update({ where: { id: input.id }, data: { status: input.status } });
+  }
   if (input.type === "listening") await db.listeningExercise.update({ where: { id: input.id }, data: { status: input.status } });
   await audit(actor.id, "CONTENT_STATUS_UPDATED", input.type, input.id, { status: input.status }); revalidatePath("/admin/content");
 }
@@ -77,5 +84,41 @@ export async function updateContentDetails(formData: FormData) {
   if (input.type === "scenario") await db.scenarioLesson.update({ where: { id: input.id }, data: { title: input.title, intro: input.primary, category: input.topic || "general", level: input.level, version: { increment: 1 } } });
   if (input.type === "listening") await db.listeningExercise.update({ where: { id: input.id }, data: { title: input.title, transcript: input.primary, translation: input.secondary || null, topic: input.topic || "general", level: input.level } });
   await audit(actor.id, "CONTENT_UPDATED", input.type, input.id, { level: input.level }); revalidatePath("/admin/content");
+}
+
+export async function updateScenarioMetadata(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = scenarioMetadataSchema.parse(Object.fromEntries(formData));
+  await db.scenarioLesson.update({ where: { id: input.lessonId }, data: { category: input.category, title: input.title, intro: input.intro, level: input.level, cultureTips: lines(input.cultureTips), misunderstandings: lines(input.misunderstandings), naturalExpressions: lines(input.naturalExpressions), sourceNote: input.sourceNote || null, version: { increment: 1 } } });
+  await audit(actor.id, "SCENARIO_METADATA_UPDATED", "ScenarioLesson", input.lessonId); revalidatePath(`/admin/content/scenarios/${input.lessonId}`); revalidatePath("/admin/content");
+}
+
+export async function addScenarioDialogue(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = scenarioDialogueSchema.parse(Object.fromEntries(formData));
+  const last = await db.scenarioDialogue.aggregate({ where: { lessonId: input.lessonId }, _max: { sequence: true } });
+  const row = await db.scenarioDialogue.create({ data: { lessonId: input.lessonId, sequence: (last._max.sequence ?? 0) + 1, speaker: input.speaker, roleName: input.roleName, textEn: input.textEn, textZh: input.textZh || null, cameraCue: input.cameraCue || null } });
+  await audit(actor.id, "SCENARIO_DIALOGUE_ADDED", "ScenarioDialogue", row.id, { lessonId: input.lessonId }); revalidatePath(`/admin/content/scenarios/${input.lessonId}`);
+}
+
+export async function addScenarioVocabulary(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = scenarioVocabularySchema.parse(Object.fromEntries(formData));
+  const last = await db.scenarioVocabulary.aggregate({ where: { lessonId: input.lessonId }, _max: { order: true } });
+  const row = await db.scenarioVocabulary.create({ data: { lessonId: input.lessonId, order: (last._max.order ?? 0) + 1, word: input.word, meaningZh: input.meaningZh, example: input.example || null } });
+  await audit(actor.id, "SCENARIO_VOCABULARY_ADDED", "ScenarioVocabulary", row.id, { lessonId: input.lessonId }); revalidatePath(`/admin/content/scenarios/${input.lessonId}`);
+}
+
+export async function addScenarioExercise(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = scenarioExerciseSchema.parse(Object.fromEntries(formData));
+  const options = lines(input.options); if (options.length < 2 || !options.includes(input.answerKey)) throw new Error("SCENARIO_OPTIONS_INVALID");
+  const last = await db.scenarioExercise.aggregate({ where: { lessonId: input.lessonId }, _max: { order: true } });
+  const row = await db.scenarioExercise.create({ data: { lessonId: input.lessonId, order: (last._max.order ?? 0) + 1, type: "MULTIPLE_CHOICE", prompt: input.prompt, answerKey: input.answerKey, options, explanation: input.explanation || null } });
+  await audit(actor.id, "SCENARIO_EXERCISE_ADDED", "ScenarioExercise", row.id, { lessonId: input.lessonId }); revalidatePath(`/admin/content/scenarios/${input.lessonId}`);
+}
+
+export async function deleteScenarioItem(formData: FormData) {
+  const actor = await requireSystemAdmin(); const input = z.object({ lessonId: z.string().uuid(), id: z.string().uuid(), type: z.enum(["dialogue", "vocabulary", "exercise"]) }).parse(Object.fromEntries(formData));
+  if (input.type === "dialogue") await db.scenarioDialogue.deleteMany({ where: { id: input.id, lessonId: input.lessonId } });
+  if (input.type === "vocabulary") await db.scenarioVocabulary.deleteMany({ where: { id: input.id, lessonId: input.lessonId } });
+  if (input.type === "exercise") await db.scenarioExercise.deleteMany({ where: { id: input.id, lessonId: input.lessonId } });
+  await audit(actor.id, "SCENARIO_ITEM_DELETED", input.type, input.id, { lessonId: input.lessonId }); revalidatePath(`/admin/content/scenarios/${input.lessonId}`);
 }
 export async function archiveUploadedFile(formData:FormData){const actor=await requireSystemAdmin();const id=z.string().uuid().parse(formData.get("id"));await db.uploadedFile.update({where:{id},data:{status:"ARCHIVED",deletedAt:new Date()}});await audit(actor.id,"FILE_ARCHIVED","UploadedFile",id);revalidatePath("/admin/files")}

@@ -20,4 +20,41 @@ export const contentEditSchema = z.object({
   topic: z.string().trim().max(120).optional(), level: cefrSchema
 });
 
+export const scenarioMetadataSchema = z.object({
+  lessonId: z.string().uuid(),
+  category: z.string().trim().min(1).max(100),
+  title: z.string().trim().min(1).max(160),
+  intro: z.string().trim().min(20).max(5000),
+  level: cefrSchema,
+  cultureTips: z.string().max(5000),
+  misunderstandings: z.string().max(5000),
+  naturalExpressions: z.string().max(5000),
+  sourceNote: z.string().trim().max(500).optional(),
+});
+
+export const scenarioDialogueSchema = z.object({
+  lessonId: z.string().uuid(), speaker: z.string().trim().min(1).max(80), roleName: z.string().trim().min(1).max(80),
+  textEn: z.string().trim().min(2).max(3000), textZh: z.string().trim().max(3000).optional(), cameraCue: z.string().trim().max(300).optional(),
+});
+
+export const scenarioVocabularySchema = z.object({
+  lessonId: z.string().uuid(), word: z.string().trim().min(1).max(100), meaningZh: z.string().trim().min(1).max(300), example: z.string().trim().max(1000).optional(),
+});
+
+export const scenarioExerciseSchema = z.object({
+  lessonId: z.string().uuid(), prompt: z.string().trim().min(2).max(2000), answerKey: z.string().trim().min(1).max(1000),
+  options: z.string().max(5000), explanation: z.string().trim().max(2000).optional(),
+});
+
+export function lines(value = "") { return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean); }
+export function scenarioPublishReadiness(counts: { dialogues: number; vocabulary: number; exercises: number; cultureTips: number; naturalExpressions: number }) {
+  const missing: string[] = [];
+  if (counts.dialogues < 8) missing.push("至少 8 句对话");
+  if (counts.vocabulary < 3) missing.push("至少 3 个场景词汇");
+  if (counts.exercises < 3) missing.push("至少 3 道练习题");
+  if (counts.cultureTips < 1) missing.push("至少 1 条文化提示");
+  if (counts.naturalExpressions < 2) missing.push("至少 2 条自然表达");
+  return missing;
+}
+
 export function csv(value = "") { return value.split(",").map((item) => item.trim()).filter(Boolean); }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentEditSchema, csv, listeningContentSchema, readingContentSchema } from "@/modules/admin/content-schemas";
+import { contentEditSchema, csv, listeningContentSchema, readingContentSchema, scenarioExerciseSchema, scenarioPublishReadiness } from "@/modules/admin/content-schemas";
 
 describe("admin content schemas", () => {
   it("normalizes target lists for manually authored reading lessons", () => {
@@ -13,5 +13,14 @@ describe("admin content schemas", () => {
 
   it("rejects invalid content edits", () => {
     expect(() => contentEditSchema.parse({ id: "bad", type: "reading", title: "", primary: "x", level: "A9" })).toThrow();
+  });
+
+  it("blocks publishing an incomplete scenario lesson", () => {
+    expect(scenarioPublishReadiness({ dialogues: 2, vocabulary: 1, exercises: 0, cultureTips: 0, naturalExpressions: 0 })).toHaveLength(5);
+    expect(scenarioPublishReadiness({ dialogues: 8, vocabulary: 3, exercises: 3, cultureTips: 1, naturalExpressions: 2 })).toEqual([]);
+  });
+
+  it("validates scenario multiple-choice authoring input", () => {
+    expect(scenarioExerciseSchema.parse({ lessonId: "11111111-1111-4111-8111-111111111111", prompt: "What happens next?", answerKey: "Call the office", options: "Wait\nCall the office" }).answerKey).toBe("Call the office");
   });
 });
