@@ -1,19 +1,18 @@
 import { auth } from "@/auth";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
-import { ProfilePicker } from "@/components/profile-picker";
 import { getAccessibleProfiles } from "@/modules/learner/access";
+import { getActiveProfile } from "@/modules/learner/selection";
 import { adjustLearningPlan, generateLearningPlan, rollbackLearningPlan } from "@/modules/planning/actions";
 
-export default async function PlansPage({ searchParams }: { searchParams: Promise<{ profile?: string }> }) {
-  const session = await auth(); const english = (await cookies()).get("ui_locale")?.value === "en"; const query = await searchParams; const profiles = await getAccessibleProfiles(session!.user.id); const selected = profiles.find((profile) => profile.id === query.profile) ?? profiles[0];
+export default async function PlansPage() {
+  const session = await auth(); const english = (await cookies()).get("ui_locale")?.value === "en"; const selected = await getActiveProfile(await getAccessibleProfiles(session!.user.id));
   const plans = selected ? await db.learningPlan.findMany({ where: { learnerProfileId: selected.id }, include: { items: { orderBy: { scheduledDate: "asc" } } }, orderBy: [{ periodStart: "desc" }, { version: "desc" }], take: 10 }) : [];
   const active = plans.find((plan) => plan.status === "ACTIVE");
   const locale = english ? "en-US" : "zh-CN";
   const t = english ? { title: "Personalized learning plan", regenerate: "Regenerate from recent performance", generate: "Generate this week's plan", version: "Version", goals: "Weekly goals", rollback: "Restore previous version", focus: "Priority weak areas", courses: "Recommended courses", review: "Recommended review", stages: "Four-week milestones", adjustments: "Dynamic adjustment suggestions", monthly: "Monthly evaluation", daily: "Daily task schedule", minutes: "min", manual: "Adjust plan manually", newGoal: "New goal", reason: "Reason for adjustment", save: "Save as new version", none: "No learning plan has been generated yet.", history: "Version history", fallback: "Generated from future learning data" } : { title: "个性化学习计划", regenerate: "依据最近表现重新生成", generate: "生成本周计划", version: "第", goals: "本周目标", rollback: "回滚上一版", focus: "重点薄弱项目", courses: "推荐课程", review: "推荐复习内容", stages: "四周阶段目标", adjustments: "动态调整建议", monthly: "月度评估", daily: "每日任务安排", minutes: "分钟", manual: "人工调整计划", newGoal: "新目标", reason: "调整原因", save: "保存为新版本", none: "尚未生成学习计划。", history: "历史版本", fallback: "根据后续学习数据生成" };
   return <div className="mx-auto max-w-6xl">
     <p className="text-sm font-bold uppercase tracking-[.2em] text-brand">Learning plan</p><h1 className="mt-2 text-4xl font-black">{t.title}</h1>
-    <ProfilePicker profiles={profiles} selectedId={selected?.id} pathname="/plans"/>
     {selected && <div className="mt-6 flex justify-end"><form action={generateLearningPlan}><input type="hidden" name="profileId" value={selected.id}/><button className="button-primary">{active ? t.regenerate : t.generate}</button></form></div>}
     {active && <section className="card mt-5">
       <div className="flex flex-wrap justify-between gap-3"><div><p className="font-bold text-brand">{t.version} {active.version} · {active.generationSource}</p><h2 className="mt-1 text-2xl font-black">{active.periodStart.toLocaleDateString(locale)} — {active.periodEnd.toLocaleDateString(locale)}</h2><p className="mt-2">{t.goals}: {active.goals.join(english ? ", " : "、")}</p><p className="mt-2 text-sm text-muted">{active.adjustmentReason}</p></div>{active.supersedesId && <form action={rollbackLearningPlan}><input type="hidden" name="planId" value={active.id}/><button className="button-ghost">{t.rollback}</button></form>}</div>

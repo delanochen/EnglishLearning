@@ -3,12 +3,12 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { getAccessibleProfiles } from "@/modules/learner/access";
+import { getActiveProfile } from "@/modules/learner/selection";
 
 export default async function Dashboard() {
   const session = await auth();
   const english = (await cookies()).get("ui_locale")?.value === "en";
-  const profiles = await getAccessibleProfiles(session!.user.id);
-  const selected = profiles[0];
+  const selected = await getActiveProfile(await getAccessibleProfiles(session!.user.id));
   const now = new Date();
   const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const [learner, activities, tasks, recentWords, mistakes] = selected ? await Promise.all([
@@ -34,7 +34,7 @@ export default async function Dashboard() {
       {[[t.todayStudy, `${minutes} ${t.minutes}`], [t.todayTasks, `${completed}/${tasks.length}`], [t.streak, `${learner?.studyStreak?.currentDays ?? 0} ${t.days}`], [t.level, learner?.cefrLevel?.replace("_", "-") ?? t.pending], [t.xp, `${learner?.totalXp ?? 0} XP`]].map(([label, value]) => <div className="metric" key={label}><span className="text-muted">{label}</span><strong className="text-3xl">{value}</strong></div>)}
     </section>
     <section className="mt-8 grid gap-5 lg:grid-cols-3">
-      <div className="card"><h2 className="text-xl font-bold">{t.taskTitle}</h2><p className="mt-2 text-muted">{t.taskBody}</p><Link href={selected ? `/tasks?profile=${selected.id}` : "/family"} className="button-primary mt-6 inline-block">{selected ? t.viewTasks : t.createProfile}</Link></div>
+      <div className="card"><h2 className="text-xl font-bold">{t.taskTitle}</h2><p className="mt-2 text-muted">{t.taskBody}</p><Link href={selected ? "/tasks" : "/family"} className="button-primary mt-6 inline-block">{selected ? t.viewTasks : t.createProfile}</Link></div>
       <div className="card"><h2 className="text-xl font-bold">{t.recommended}</h2><p className="mt-2 text-muted">{t.recommendedBody}</p><Link href="/learn/scenarios" className="button-ghost mt-6 inline-block">{t.enterCourse}</Link></div>
       <div className="card"><h2 className="text-xl font-bold">{t.tutor}</h2><p className="mt-2 text-muted">{t.tutorBody}</p><Link href="/learn/tutor" className="button-ghost mt-6 inline-block">{t.start}</Link></div>
     </section>
@@ -42,6 +42,6 @@ export default async function Dashboard() {
       <div className="card"><h2 className="text-xl font-black">{t.recentWords}</h2>{recentWords.map((item) => <p className="mt-2" key={item.id}><strong>{item.vocabulary.word}</strong> · {Math.round(item.mastery * 100)}% · {item.state}</p>)}{!recentWords.length && <p className="mt-2 text-muted">{t.noWords}</p>}</div>
       <div className="card"><h2 className="text-xl font-black">{t.recentMistakes}</h2>{mistakes.map((item) => <details className="mt-2 rounded-xl border p-3" key={item.id}><summary className="cursor-pointer"><strong>{item.module}</strong> · {item.prompt}</summary><p className="mt-2 text-sm text-muted">{english ? "Your answer" : "你的答案"}：{item.answer || "—"}</p><p className="mt-1 text-sm">{english ? "Correct answer" : "正确答案"}：{item.correctAnswer}</p>{item.explanation && <p className="mt-1 text-sm text-muted">{item.explanation}</p>}</details>)}{!mistakes.length && <p className="mt-2 text-muted">{t.noMistakes}</p>}</div>
     </section>
-    <div className="mt-5 flex gap-3"><Link href={selected ? `/plans?profile=${selected.id}` : "/family"} className="button-ghost">{t.plan}</Link><Link href={selected ? `/reports?profile=${selected.id}` : "/family"} className="button-ghost">{t.report}</Link><Link href="/family-dashboard" className="button-ghost">{t.family}</Link></div>
+    <div className="mt-5 flex gap-3"><Link href={selected ? "/plans" : "/family"} className="button-ghost">{t.plan}</Link><Link href={selected ? "/reports" : "/family"} className="button-ghost">{t.report}</Link><Link href="/family-dashboard" className="button-ghost">{t.family}</Link></div>
   </div>;
 }

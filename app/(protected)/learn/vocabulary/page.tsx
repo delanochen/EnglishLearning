@@ -3,13 +3,12 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { VocabularySlideDeck } from "@/components/vocabulary-slide-deck";
 import { getAccessibleProfiles } from "@/modules/learner/access";
+import { getActiveProfile } from "@/modules/learner/selection";
 
-export default async function VocabularyPage({ searchParams }: { searchParams: Promise<{ profile?: string }> }) {
+export default async function VocabularyPage() {
   const session = await auth();
   const english = (await cookies()).get("ui_locale")?.value === "en";
-  const params = await searchParams;
-  const profiles = await getAccessibleProfiles(session!.user.id);
-  const selected = profiles.find((profile) => profile.id === params.profile) ?? profiles[0];
+  const selected = await getActiveProfile(await getAccessibleProfiles(session!.user.id));
   const learner = selected ? await db.learnerProfile.findUnique({ where: { id: selected.id }, select: { cefrLevel: true, dailyVocabularyGoal: true } }) : null;
   const now = new Date();
   const words = learner?.cefrLevel ? await db.vocabulary.findMany({

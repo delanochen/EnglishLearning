@@ -2,9 +2,9 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { ProfilePicker } from "@/components/profile-picker";
 import { SpeakingRecorder } from "@/components/speaking-recorder";
 import { getAccessibleProfiles } from "@/modules/learner/access";
+import { getActiveProfile } from "@/modules/learner/selection";
 import { calculateSpeakingTrend } from "@/modules/speaking/trend";
 
 const modes = [
@@ -18,8 +18,7 @@ export default async function SpeakingPage({ searchParams }: { searchParams: Pro
   const session = await auth();
   const english = (await cookies()).get("ui_locale")?.value === "en";
   const query = await searchParams;
-  const profiles = await getAccessibleProfiles(session!.user.id);
-  const selected = profiles.find((profile) => profile.id === query.profile) ?? profiles[0];
+  const selected = await getActiveProfile(await getAccessibleProfiles(session!.user.id));
   const practice = modes.find((mode) => mode.id === query.mode) ?? modes[0];
   const history = selected ? await db.speakingSession.findMany({ where: { learnerProfileId: selected.id }, include: { attempts: { include: { pronunciation: true, audioFile: true }, orderBy: { createdAt: "desc" } } }, orderBy: { startedAt: "desc" }, take: 20 }) : [];
   const allAttempts = history.flatMap((item) => item.attempts);
@@ -28,8 +27,7 @@ export default async function SpeakingPage({ searchParams }: { searchParams: Pro
 
   return <div className="mx-auto max-w-5xl">
     <p className="text-sm font-bold uppercase tracking-[.2em] text-brand">Speaking</p><h1 className="mt-2 text-4xl font-black">{t.title}</h1>
-    <ProfilePicker profiles={profiles} selectedId={selected?.id} pathname="/learn/speaking"/>
-    {selected && <div className="mt-5 flex flex-wrap gap-2">{modes.map((mode) => <Link className={mode.id === practice.id ? "button-primary" : "button-ghost"} href={`/learn/speaking?profile=${selected.id}&mode=${mode.id}`} key={mode.id}>{english ? mode.en : mode.zh}</Link>)}</div>}
+    {selected && <div className="mt-5 flex flex-wrap gap-2">{modes.map((mode) => <Link className={mode.id === practice.id ? "button-primary" : "button-ghost"} href={`/learn/speaking?mode=${mode.id}`} key={mode.id}>{english ? mode.en : mode.zh}</Link>)}</div>}
     {selected && <>
       <section className="card mt-7"><p className="label">{english ? practice.en : practice.zh}</p><h2 className="mt-2 text-2xl font-black">{practice.prompt}</h2>{practice.id === "FREE_CONVERSATION" && <p className="mt-2 text-muted">{t.freeHelp}</p>}<div className="mt-5"><SpeakingRecorder profileId={selected.id} prompt={practice.prompt} mode={practice.id} english={english}/></div></section>
       <section className="mt-7"><h2 className="text-2xl font-black">{t.history}</h2>

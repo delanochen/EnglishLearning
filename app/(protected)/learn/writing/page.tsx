@@ -1,16 +1,14 @@
-import { auth } from "@/auth";
+﻿import { auth } from "@/auth";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
-import { ProfilePicker } from "@/components/profile-picker";
 import { getAccessibleProfiles } from "@/modules/learner/access";
+import { getActiveProfile } from "@/modules/learner/selection";
 import { submitWriting } from "@/modules/writing/actions";
 
-export default async function WritingPage({ searchParams }: { searchParams: Promise<{ profile?: string }> }) {
+export default async function WritingPage() {
   const session = await auth();
   const english = (await cookies()).get("ui_locale")?.value === "en";
-  const query = await searchParams;
-  const profiles = await getAccessibleProfiles(session!.user.id);
-  const selected = profiles.find((profile) => profile.id === query.profile) ?? profiles[0];
+  const selected = await getActiveProfile(await getAccessibleProfiles(session!.user.id));
   const assignments = selected ? await db.writingAssignment.findMany({
     where: { status: "PUBLISHED", ...(selected.level ? { level: selected.level } : {}) },
     include: { submissions: { where: { learnerProfileId: selected.id }, include: { feedback: true }, orderBy: { version: "desc" } } },
@@ -20,7 +18,7 @@ export default async function WritingPage({ searchParams }: { searchParams: Prom
   const t = english ? { title: "Writing practice", target: "Target", words: "words", revise: "Submit revision", submit: "Submit for feedback", version: "Version", feedback: "feedback", grammar: "Grammar", spelling: "Spelling", vocabulary: "Vocabulary", structure: "Structure", naturalness: "Naturalness", issues: "Detailed issues and suggestions", full: "Whole text", suggestion: "Suggestion", rewrite: "View suggested rewrite", saved: "saved versions", empty: "No writing assignments are available for this level yet." } : { title: "写作练习", target: "目标", words: "词", revise: "提交新版本", submit: "提交并批改", version: "第", feedback: "版反馈", grammar: "语法", spelling: "拼写", vocabulary: "词汇", structure: "结构", naturalness: "自然度", issues: "逐条问题与修改建议", full: "全文建议", suggestion: "建议", rewrite: "查看参考改写", saved: "个已保存版本", empty: "当前级别还没有写作题目。" };
   return <div className="mx-auto max-w-5xl">
     <p className="text-sm font-bold uppercase tracking-[.2em] text-brand">Writing</p><h1 className="mt-2 text-4xl font-black">{t.title}</h1>
-    <ProfilePicker profiles={profiles} selectedId={selected?.id} pathname="/learn/writing"/>
+    
     <div className="mt-7 space-y-5">{selected && assignments.map((assignment) => {
       const latest = assignment.submissions[0];
       const annotations = Array.isArray(latest?.feedback?.annotations) ? latest.feedback.annotations as Array<{ excerpt?: string; issue?: string; suggestion?: string }> : [];
@@ -29,3 +27,5 @@ export default async function WritingPage({ searchParams }: { searchParams: Prom
     {selected && !assignments.length && <div className="card mt-7">{t.empty}</div>}
   </div>;
 }
+
+
