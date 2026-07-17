@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { modelFormSchema } from "@/modules/ai/schemas";
+import { modelFormSchema, providerFormSchema } from "@/modules/ai/schemas";
+import { resolveProviderPreset } from "@/modules/ai/provider-presets";
 
 const providerId = "11111111-1111-4111-8111-111111111111";
 const modelId = "22222222-2222-4222-8222-222222222222";
@@ -50,5 +51,12 @@ describe("AI model form schema", () => {
       maxTokens: "0",
       priority: "0"
     })).toThrow();
+  });
+
+  it("maps Chinese provider presets to OpenAI-compatible endpoints", () => {
+    expect(resolveProviderPreset("DEEPSEEK", "OPENAI", "https://wrong.test")).toEqual({ type: "OPENAI_COMPATIBLE", baseUrl: "https://api.deepseek.com/v1" });
+    expect(resolveProviderPreset("QWEN", "OPENAI", "https://wrong.test")).toEqual({ type: "OPENAI_COMPATIBLE", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1" });
+    const input = providerFormSchema.parse({ name: "Family DeepSeek", preset: "DEEPSEEK", type: "OPENAI", baseUrl: "https://api.openai.com/v1", apiKey: "secret", timeoutMs: "30000", priority: "100" });
+    expect(input.preset).toBe("DEEPSEEK");
   });
 });

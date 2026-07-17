@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { maskApiKey } from "@/lib/settings-crypto";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
 import { addModel, deleteProvider, removeModel, removeRouteModel, saveModel, saveProvider, saveRoute, testProvider, testProviderGeneration, toggleProvider } from "@/modules/ai/admin-actions";
+import { providerPresets } from "@/modules/ai/provider-presets";
 import { summarizeAIUsage } from "@/modules/ai/usage-stats";
 
 const purposeLabels: Record<AIUsagePurpose, string> = {
@@ -32,6 +33,7 @@ export default async function AIAdminPage() {
       <summary className="cursor-pointer text-xl font-bold">{t.addProvider}</summary>
       <form action={saveProvider} className="mt-5 grid gap-4 md:grid-cols-2">
         <label><span className="label">{t.name}</span><input className="input" name="name" required /></label>
+        <label><span className="label">{english ? "Common provider preset" : "常用 Provider 预设"}</span><select className="input" name="preset" defaultValue="OPENAI"><option value="CUSTOM">{english ? "Custom / advanced" : "自定义 / 高级"}</option>{providerPresets.map((preset) => <option value={preset.id} key={preset.id}>{preset.label} · {preset.models.join(" / ")}</option>)}</select></label>
         <label><span className="label">{t.type}</span><select className="input" name="type" defaultValue="OPENAI"><option>OPENAI</option><option>OPENROUTER</option><option>GEMINI</option><option>OPENAI_COMPATIBLE</option><option>OLLAMA</option></select></label>
         <label className="md:col-span-2"><span className="label">Base URL</span><input className="input" type="url" name="baseUrl" required defaultValue="https://api.openai.com/v1" /></label>
         <label><span className="label">API Key</span><input className="input" type="password" name="apiKey" autoComplete="new-password" /></label>

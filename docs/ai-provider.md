@@ -21,6 +21,20 @@ Ollama:      http://ollama:11434
 
 OpenAI Compatible API 应填写包含版本前缀、且其后可以追加 `/chat/completions` 的地址。
 
+## 中国常用模型
+
+新增 Provider 时可以直接选择后台的“常用 Provider 预设”。系统会自动保存对应的协议类型和 Base URL；随后仍需在该 Provider 下添加厂商控制台显示的真实模型 ID。
+
+```text
+DeepSeek:     https://api.deepseek.com/v1
+通义千问/百炼: https://dashscope.aliyuncs.com/compatible-mode/v1
+智谱 GLM:     https://open.bigmodel.cn/api/paas/v4
+月之暗面 Kimi: https://api.moonshot.cn/v1
+硅基流动:      https://api.siliconflow.cn/v1
+```
+
+这些服务均通过 OpenAI Chat Completions 兼容协议接入。百炼的端点可能因地域、工作空间或套餐而不同，控制台给出的地址优先于预设地址。所谓“免费模型”通常是限时赠送额度、限速模型或新用户试用，并不代表长期无限免费；申请 API Key 时应查看厂商当前价格、额度、数据使用条款和地区限制。若希望请求不离开家庭网络，可使用 Ollama，但 NAS 必须有足够内存和算力。
+
 ## Key 安全
 
 - API Key 只提交到服务器，不返回旧值。

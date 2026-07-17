@@ -4,15 +4,17 @@ import { db } from "@/lib/db";
 import { decryptSetting, encryptSetting, getSettingsEncryptionKey } from "@/lib/settings-crypto";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
 import { createProvider } from "./providers/factory";
+import { resolveProviderPreset } from "./provider-presets";
 import { idSchema, modelFormSchema, providerFormSchema, routeFormSchema } from "./schemas";
 
 export async function saveProvider(formData: FormData) {
   const user = await requireSystemAdmin();
   const input = providerFormSchema.parse(Object.fromEntries(formData));
-  if (input.type !== "OLLAMA" && !input.providerId && !input.apiKey) throw new Error("API_KEY_REQUIRED");
+  const resolved = resolveProviderPreset(input.preset, input.type, input.baseUrl);
+  if (resolved.type !== "OLLAMA" && !input.providerId && !input.apiKey) throw new Error("API_KEY_REQUIRED");
   const encrypted = input.apiKey ? encryptSetting(input.apiKey, await getSettingsEncryptionKey()) : null;
   const data = {
-    name: input.name, type: input.type, baseUrl: input.baseUrl.replace(/\/$/, ""), timeoutMs: input.timeoutMs, priority: input.priority, notes: input.notes || null,
+    name: input.name, type: resolved.type, baseUrl: resolved.baseUrl.replace(/\/$/, ""), timeoutMs: input.timeoutMs, priority: input.priority, notes: input.notes || null,
     ...(encrypted ? { encryptedApiKey: encrypted.ciphertext, apiKeyIv: encrypted.iv, apiKeyAuthTag: encrypted.authTag, keyVersion: encrypted.keyVersion } : {})
   };
   const provider = input.providerId

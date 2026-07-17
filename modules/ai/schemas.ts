@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { providerPresetIds } from "./provider-presets";
 
 export const providerFormSchema = z.object({
   providerId: z.string().uuid().optional(),
+  preset: z.enum(providerPresetIds).default("CUSTOM"),
   name: z.string().trim().min(2).max(80),
   type: z.enum(["OPENAI", "OPENROUTER", "GEMINI", "OPENAI_COMPATIBLE", "OLLAMA"]),
   baseUrl: z.string().url().max(500),
