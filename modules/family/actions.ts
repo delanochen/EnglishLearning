@@ -19,6 +19,7 @@ export async function createFamily(formData: FormData) {
     await tx.auditLog.create({ data: { actorUserId: session.user.id, familyId: family.id, action: "family.create", resourceType: "Family", resourceId: family.id } });
   });
   revalidatePath("/family");
+  redirect("/family");
 }
 
 export async function updateFamily(formData: FormData) {
