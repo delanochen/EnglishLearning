@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTutorSystemPrompt } from "@/modules/tutor/prompt";
+import { buildTutorSystemPrompt, tutorUnavailableMessage } from "@/modules/tutor/prompt";
 
 describe("AI tutor language policy", () => {
   it("uses English-first behavior in immersion mode", () => {
@@ -7,6 +7,10 @@ describe("AI tutor language policy", () => {
     expect(prompt).toContain("Use English by default");
     expect(prompt).toContain("explicitly asks for Chinese help");
     expect(prompt).toContain("natural expression");
+  });
+  it("localizes provider outage guidance", () => {
+    expect(tutorUnavailableMessage(true)).toContain("temporarily unavailable");
+    expect(tutorUnavailableMessage(false)).toContain("暂时不可用");
   });
 
   it("keeps level-aware Chinese assistance in Chinese mode", () => {

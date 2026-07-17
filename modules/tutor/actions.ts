@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 import { routedChat } from "@/modules/ai/gateway";
 import { requireProfileAccess } from "@/modules/learner/access";
 import { completeTodayTaskForModule } from "@/modules/tasks/module-completion";
-import { buildTutorSystemPrompt } from "./prompt";
+import { buildTutorSystemPrompt, tutorUnavailableMessage } from "./prompt";
 
 const createSchema = z.object({ profileId: z.string().uuid(), topic: z.string().trim().min(2).max(120), teacherStyle: z.enum(["GENTLE", "STRICT", "CHILD", "ACADEMIC", "US_LIFE", "WORKPLACE"]) });
 const messageSchema = z.object({ conversationId: z.string().uuid(), content: z.string().trim().min(1).max(4000) });
@@ -36,7 +36,7 @@ export async function sendTutorMessage(formData: FormData) {
   try {
     const response = await routedChat("TUTOR", { messages: [{ role: "system", content: buildTutorSystemPrompt(style, level, conversation.topic, immersion) }, ...conversation.messages.map((message) => ({ role: message.role as "user" | "assistant", content: message.content })), { role: "user", content: input.content }] }, session.user.id);
     text = response.text; inputTokens = response.inputTokens; outputTokens = response.outputTokens;
-  } catch { text = "AI 老师暂时不可用。请让系统管理员在“管理后台 → AI 模型管理”中配置并测试 TUTOR 用途路由。"; }
+  } catch { text = tutorUnavailableMessage(immersion); }
   await db.$transaction([
     db.aIMessage.create({ data: { conversationId: conversation.id, role: "assistant", content: text, sequence: nextSequence + 1, inputTokens, outputTokens } }),
     db.aIConversation.update({ where: { id: conversation.id }, data: { lastMessageAt: new Date() } }),
