@@ -4,12 +4,15 @@ import { FixedWindowRateLimiter } from "@/lib/rate-limit";
 const limiter = new FixedWindowRateLimiter(120, 60_000);
 const uploadLimiter = new FixedWindowRateLimiter(20, 60_000);
 const protectedPrefixes = ["/dashboard", "/admin", "/family", "/learn", "/tasks", "/plans", "/reports", "/placement", "/notifications", "/account"];
+const learnerPrefixes = ["/dashboard", "/learn", "/tasks", "/plans", "/reports", "/placement"];
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const protectedPath = protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
   const hasSessionCookie = request.cookies.getAll().some(({ name }) => name === "authjs.session-token" || name === "__Secure-authjs.session-token" || name.startsWith("authjs.session-token.") || name.startsWith("__Secure-authjs.session-token."));
   if (protectedPath && !hasSessionCookie) return NextResponse.redirect(new URL("/login", request.url));
+  const learnerPath = learnerPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  if (learnerPath && hasSessionCookie && !request.cookies.has("homelingua_active_profile")) return NextResponse.redirect(new URL("/profiles", request.url));
   if (pathname.startsWith("/api/auth/") || pathname === "/api/uploads") {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? request.headers.get("x-real-ip") ?? "unknown";
     const result = (pathname === "/api/uploads" ? uploadLimiter : limiter).check(`${ip}:${pathname}`);

@@ -1,6 +1,7 @@
 "use server";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { signIn, signOut } from "@/auth";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -9,7 +10,8 @@ import { z } from "zod";
 
 export async function loginAction(_: { error?: string } | undefined, formData: FormData) {
   try {
-    await signIn("credentials", { email: formData.get("email"), password: formData.get("password"), redirectTo: "/dashboard" });
+    (await cookies()).delete("homelingua_active_profile");
+    await signIn("credentials", { email: formData.get("email"), password: formData.get("password"), redirectTo: "/profiles" });
   } catch (error) {
     if (error instanceof AuthError) return { error: "邮箱或密码不正确，或登录尝试过于频繁。" };
     throw error;
