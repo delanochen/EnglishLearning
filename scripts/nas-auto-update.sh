@@ -23,25 +23,41 @@ notify_deployment_success() {
   version="$1"
   commit="$2"
   notify_target="${AUTO_UPDATE_NOTIFY_TARGET:-@administrators}"
+  email_target="${AUTO_UPDATE_EMAIL:-$(cat "$PROJECT_DIR/secrets/initial_admin_email" 2>/dev/null || true)}"
   notify_title="HomeLingua updated successfully"
   notify_message="HomeLingua v${version} was deployed successfully on $(hostname) at $(date '+%Y-%m-%d %H:%M:%S'). Commit: ${commit}."
-  notify_bin=""
-  for candidate in /usr/syno/bin/synodsmnotify /usr/syno/sbin/synodsmnotify; do
-    if [ -x "$candidate" ]; then notify_bin="$candidate"; break; fi
+  sendmail_bin=""
+  for candidate in /usr/sbin/sendmail /usr/bin/sendmail /bin/sendmail; do
+    if [ -x "$candidate" ]; then sendmail_bin="$candidate"; break; fi
   done
-  if [ -z "$notify_bin" ] && command -v synodsmnotify >/dev/null 2>&1; then
-    notify_bin="$(command -v synodsmnotify)"
+  if [ -z "$sendmail_bin" ] && command -v sendmail >/dev/null 2>&1; then
+    sendmail_bin="$(command -v sendmail)"
   fi
-  if [ -z "$notify_bin" ]; then
-    echo "Deployment succeeded, but synodsmnotify was not found; success email was not sent."
-    return 1
+  if [ -n "$sendmail_bin" ] && [ -n "$email_target" ]; then
+    if printf 'To: %s\nSubject: %s\nContent-Type: text/plain; charset=UTF-8\n\n%s\n' \
+      "$email_target" "$notify_title" "$notify_message" | "$sendmail_bin" -t; then
+      echo "Success email submitted to: $email_target"
+      return 0
+    fi
+    echo "NAS sendmail rejected the deployment email." >&2
   fi
-  if "$notify_bin" "$notify_target" "$notify_title" "$notify_message"; then
-    echo "Success notification submitted to DSM target: $notify_target"
-  else
-    echo "Deployment succeeded, but DSM rejected the success notification." >&2
-    return 1
+
+  # DSM 7 only accepts package-owned i18n keys for desktop notifications.
+  # Set all three variables below when a DSM package supplies those keys.
+  if [ -n "${DSM_NOTIFY_APP_ID:-}" ] && [ -n "${DSM_NOTIFY_TITLE_KEY:-}" ] && [ -n "${DSM_NOTIFY_MESSAGE_KEY:-}" ]; then
+    notify_bin=""
+    for candidate in /usr/syno/bin/synodsmnotify /usr/syno/sbin/synodsmnotify; do
+      if [ -x "$candidate" ]; then notify_bin="$candidate"; break; fi
+    done
+    if [ -n "$notify_bin" ] && "$notify_bin" -c "$DSM_NOTIFY_APP_ID" "$notify_target" \
+      "$DSM_NOTIFY_TITLE_KEY" "$DSM_NOTIFY_MESSAGE_KEY"; then
+      echo "DSM desktop notification submitted to: $notify_target"
+      return 0
+    fi
   fi
+
+  echo "Deployment succeeded, but no working email or DSM i18n notification channel was found." >&2
+  return 1
 }
 
 verify_running_version() {
