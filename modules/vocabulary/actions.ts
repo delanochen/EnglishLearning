@@ -35,6 +35,8 @@ export async function completeVocabularySession(profileId: string) {
   revalidatePath("/tasks"); revalidatePath("/dashboard"); revalidatePath("/learn/vocabulary");
 }
 
+export async function updateVocabularyGoal(formData:FormData){const session=await auth();if(!session?.user.id)throw new Error("UNAUTHENTICATED");const input=z.object({profileId:z.string().uuid(),dailyVocabularyGoal:z.coerce.number().int().min(1).max(100)}).parse(Object.fromEntries(formData));await requireProfileAccess(session.user.id,input.profileId);await db.learnerProfile.update({where:{id:input.profileId},data:{dailyVocabularyGoal:input.dailyVocabularyGoal}});revalidatePath("/learn/vocabulary");revalidatePath("/family");revalidatePath("/tasks");}
+
 export async function submitVocabularyGame(formData:FormData){
   const session=await auth();if(!session?.user.id)throw new Error("UNAUTHENTICATED");
   const input=z.object({profileId:z.string().uuid(),mode:z.enum(["DAILY","WEEKLY"]),answers:z.string().transform(value=>JSON.parse(value)).pipe(z.array(z.object({vocabularyId:z.string().uuid(),questionType:z.enum(["MEANING","AUDIO","SPELLING","CONTEXT"]),answer:z.string().max(200),responseMs:z.number().int().min(0).max(300000)})).min(1).max(100))}).parse(Object.fromEntries(formData)) as {profileId:string;mode:"DAILY"|"WEEKLY";answers:GameAnswer[]};

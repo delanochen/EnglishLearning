@@ -21,7 +21,7 @@ describe("memberUpdateSchema", () => {
   });
 
   it("rejects an excessive daily vocabulary goal", () => {
-    expect(() => memberUpdateSchema.parse({ ...base, dailyVocabularyGoal: "100" })).toThrow();
+    expect(() => memberUpdateSchema.parse({ ...base, dailyVocabularyGoal: "101" })).toThrow();
   });
 
   it("rejects unsupported daily study time", () => {

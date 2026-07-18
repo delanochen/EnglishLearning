@@ -5,6 +5,7 @@ describe("NAS deployment scripts", () => {
   const deploy = readFileSync("scripts/nas-deploy.sh", "utf8");
   const restore = readFileSync("scripts/restore.sh", "utf8");
   const autoUpdate = readFileSync("scripts/nas-auto-update.sh", "utf8");
+  const wordnetImport = readFileSync("scripts/import-open-wordnet.sh", "utf8");
 
   it("uses the configured published app port for readiness checks", () => {
     expect(deploy).toContain('APP_PORT="${APP_PORT:-3000}"');
@@ -58,5 +59,11 @@ describe("NAS deployment scripts", () => {
     expect(autoUpdate).toContain('mkdir "$LOCK_DIR"');
     expect(autoUpdate).toContain('scripts/nas-deploy.sh');
     expect(autoUpdate).toContain('git status --porcelain --untracked-files=no');
+  });
+
+  it("imports the attributed open wordnet through Docker secrets",()=>{
+    expect(wordnetImport).toContain("/run/secrets/postgres_password");
+    expect(wordnetImport).toContain("english-wordnet-2025.zip");
+    expect(wordnetImport).toContain("import-open-wordnet.ts");
   });
 });

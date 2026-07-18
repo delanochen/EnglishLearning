@@ -36,8 +36,8 @@ export function VocabularySlideDeck({ profileId, slides, english }: { profileId:
   const [pending, startTransition] = useTransition();
   const slide = slides[index];
   const ui = english
-    ? { session: "Vocabulary session", instruction: "Say the meaning before revealing the answer", reveal: "Reveal answer", hide: "Hide answer", example: "In context", collocations: "Word partners", synonyms: "Similar", antonyms: "Opposite", forgot: "Forgot", hard: "Almost", mastered: "Got it", rate: "How well did you remember it?", complete: "Session complete", completeHelp: "You reviewed every word in this session.", again: "Review again", next: "Next slide", previous: "Previous slide", progress: "Session progress", mastery: "Mastery", due: "Next review" }
-    : { session: "今日单词课堂", instruction: "先在心里说出含义，再揭晓答案", reveal: "揭晓答案", hide: "隐藏答案", example: "情境例句", collocations: "常用搭配", synonyms: "近义词", antonyms: "反义词", forgot: "忘记了", hard: "有点难", mastered: "记住了", rate: "这次记得怎么样？", complete: "本轮学习完成", completeHelp: "这一组单词已经全部复习，系统已安排后续复习时间。", again: "再学一遍", next: "下一页", previous: "上一页", progress: "课程进度", mastery: "掌握度", due: "下次复习" };
+    ? { session: "Vocabulary session", instruction: "Say the meaning before revealing the answer", reveal: "Reveal answer", hide: "Hide answer", example: "In context", collocations: "Word partners", synonyms: "Similar", antonyms: "Opposite", forgot: "Forgot", hard: "Almost", mastered: "Got it", rate: "How well did you remember it?", complete: "Session complete", completeHelp: "You reviewed every word in this batch. You can continue with another batch today.", again: "Review again",more:"Learn another batch", next: "Next slide", previous: "Previous slide", progress: "Session progress", mastery: "Mastery", due: "Next review" }
+    : { session: "今日单词课堂", instruction: "先在心里说出含义，再揭晓答案", reveal: "揭晓答案", hide: "隐藏答案", example: "情境例句", collocations: "常用搭配", synonyms: "近义词", antonyms: "反义词", forgot: "忘记了", hard: "有点难", mastered: "记住了", rate: "这次记得怎么样？", complete: "本轮学习完成", completeHelp: "这一组单词已经完成，系统已安排后续复习；今天还可以继续学习下一组。", again: "再学一遍",more:"继续下一组", next: "下一页", previous: "上一页", progress: "课程进度", mastery: "掌握度", due: "下次复习" };
 
   const completed = Object.keys(reviewed).length === slides.length;
   const percent = slides.length ? Math.round(((index + 1) / slides.length) * 100) : 0;
@@ -91,7 +91,7 @@ export function VocabularySlideDeck({ profileId, slides, english }: { profileId:
   if (completed) return <section className="mt-8 overflow-hidden rounded-[2rem] bg-gradient-to-br from-teal-950 via-teal-800 to-cyan-700 p-8 text-center text-white shadow-2xl md:p-14">
     <Sparkles className="mx-auto" size={54}/><h2 className="mt-5 text-4xl font-black">{ui.complete}</h2><p className="mx-auto mt-3 max-w-xl text-lg text-white/75">{ui.completeHelp}</p>
     <div className="mx-auto mt-8 grid max-w-lg grid-cols-3 gap-3"><Result value={Object.values(reviewed).filter((v) => v === 1).length} label={ui.forgot}/><Result value={Object.values(reviewed).filter((v) => v === 3).length} label={ui.hard}/><Result value={Object.values(reviewed).filter((v) => v === 5).length} label={ui.mastered}/></div>
-    <button className="mt-8 rounded-2xl bg-white px-6 py-3 font-black text-teal-900" type="button" onClick={() => { setReviewed({}); move(0); }}><RotateCcw className="mr-2 inline" size={18}/>{ui.again}</button>
+    <div className="mt-8 flex flex-wrap justify-center gap-3"><button className="rounded-2xl bg-white/15 px-6 py-3 font-black text-white" type="button" onClick={() => { setReviewed({}); move(0); }}><RotateCcw className="mr-2 inline" size={18}/>{ui.again}</button><button className="rounded-2xl bg-white px-6 py-3 font-black text-teal-900" type="button" onClick={() => window.location.reload()}>{ui.more}<ChevronRight className="ml-2 inline" size={18}/></button></div>
   </section>;
 
   return <section className="mt-8">

@@ -579,6 +579,9 @@ model Vocabulary {
   topic         String
   audioUrl      String?
   imageUrl      String?
+  sourceName    String?
+  sourceUrl     String?
+  sourceLicense String?
   status        ContentStatus            @default(PUBLISHED)
   createdAt     DateTime                 @default(now())
   updatedAt     DateTime                 @updatedAt
