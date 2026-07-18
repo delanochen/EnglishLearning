@@ -2,6 +2,8 @@
 
 HomeLingua 是面向家庭 NAS 的自托管英语学习平台，覆盖家庭成员管理、十类学习模块、多 Provider AI、自动学习计划与报告，以及可恢复的 NAS 运维链路。
 
+网页右下角显示当前部署版本。版本升级规则见 [版本策略](docs/versioning.md)。
+
 ## 已实现
 
 - Next.js 15 App Router、TypeScript strict、Tailwind CSS、shadcn/ui 配置
