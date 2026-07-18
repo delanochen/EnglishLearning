@@ -71,11 +71,13 @@ export async function routedChat(purpose: AIUsagePurpose, input: Omit<ChatInput,
 }
 
 export async function routedStructured<T>(purpose: AIUsagePurpose, input: Omit<StructuredInput<T>, "model">, userId?: string) {
-  const first = await routedChat(purpose, { ...input, messages: [...input.messages, { role: "system", content: `Return only JSON for schema ${input.schemaName}.` }] }, userId);
+  const contract=input.schemaInstructions??input.schemaName;
+  const first = await routedChat(purpose, { ...input, messages: [...input.messages, { role: "system", content: `Return one JSON object only. Do not use Markdown or wrap it in another property. Follow this exact contract:\n${contract}` }] }, userId);
   try { return input.schema.parse(JSON.parse(first.text)); }
   catch (error) {
     await db.auditLog.create({ data: { actorUserId: userId, action: "AI_STRUCTURED_VALIDATION_RETRY", resourceType: "AISchema", resourceId: input.schemaName, metadata: { error: error instanceof Error ? error.name : "VALIDATION_ERROR" } } });
-    const retry = await routedChat(purpose, { ...input, messages: [...input.messages, { role: "system", content: `Your previous response was invalid. Return only valid JSON matching ${input.schemaName}.` }] }, userId);
+    const issue=error instanceof Error?error.message:"VALIDATION_ERROR";
+    const retry = await routedChat(purpose, { ...input, messages: [...input.messages, { role: "system", content: `Your previous JSON failed validation: ${issue.slice(0,2000)}. Return one corrected JSON object only, with the exact keys and enum casing in this contract:\n${contract}` }] }, userId);
     try { return input.schema.parse(JSON.parse(retry.text)); }
     catch (retryError) { await db.auditLog.create({ data: { actorUserId: userId, action: "AI_STRUCTURED_VALIDATION_FAILED", resourceType: "AISchema", resourceId: input.schemaName, metadata: { error: retryError instanceof Error ? retryError.name : "VALIDATION_ERROR" } } }); throw retryError; }
   }

@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { dailyTaskOutputSchema, placementReportSchema, scenarioCourseSchema, vocabularyCourseSchema, weeklyPlanOutputSchema } from "@/modules/ai/content-schemas";
+import { dailyTaskOutputSchema, placementReportSchema, readingArticleSchema, scenarioCourseSchema, vocabularyCourseSchema, weeklyPlanOutputSchema } from "@/modules/ai/content-schemas";
 
 describe("AI content schemas", () => {
+  it("normalizes common DeepSeek reading field aliases",()=>{
+    const payload={article:{title:"High school",content:"Students arrive early for classes and spend the day learning, joining clubs, meeting friends, and preparing carefully for future opportunities in their community.",level:"B1",target_audience:"teens",theme:"school",target_vocabulary:["club"],target_grammar:["present simple"],abstract:"A school day."},questions:[{type:"multiple-choice",question:"Where are the students?",options:["School","Home"],correct_answer:"School",rationale:"The passage says so."},{type:"true-false",question:"They study.",correct_answer:"True"},{type:"short-answer",question:"Name one activity.",correct_answer:"Joining clubs"}]};
+    const parsed=readingArticleSchema.parse(payload);
+    expect(parsed.body).toContain("Students arrive");expect(parsed.questions[0]?.type).toBe("MULTIPLE_CHOICE");expect(parsed.audience).toBe("teens");
+  });
   it("rejects incomplete vocabulary output", () => expect(vocabularyCourseSchema.safeParse({ word: "learn" }).success).toBe(false));
   it("accepts a structured daily task", () => expect(dailyTaskOutputSchema.safeParse({ taskType: "READING", title: "Read", description: "One article", estimatedMinutes: 10, xpReward: 10, reason: "level" }).success).toBe(true));
   it("bounds placement section scores", () => expect(placementReportSchema.safeParse({ assessedLevel: "A2", sectionScores: { reading: 120 }, strengths: [], weakAreas: [], recommendations: [] }).success).toBe(false));
