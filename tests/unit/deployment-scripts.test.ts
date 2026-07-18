@@ -17,6 +17,10 @@ describe("NAS deployment scripts", () => {
     expect(deploy.indexOf("mkdir -p data/postgres uploads logs backups backups/restore-staging")).toBeLessThan(deploy.indexOf("docker compose --profile operations run --rm backup"));
   });
 
+  it("makes application bind mounts writable by the non-root container user",()=>{
+    expect(deploy).toContain("chown -R 1001:1001 uploads logs backups");
+  });
+
   it("quotes Prisma configuration table names in the settings snapshot", () => {
     const backup = readFileSync("scripts/backup.sh", "utf8");
     for (const table of ["SystemSetting", "AIProvider", "AIModel", "AIUsageRoute", "AIUsageRouteModel"]) {

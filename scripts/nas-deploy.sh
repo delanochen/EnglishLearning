@@ -15,7 +15,7 @@ done
 chmod 700 secrets
 chmod 644 secrets/*
 mkdir -p data/postgres uploads logs backups backups/restore-staging
-chown 1001:1001 backups
+chown -R 1001:1001 uploads logs backups
 "$GIT_BIN" config --global --add safe.directory "$PROJECT_DIR" >/dev/null 2>&1 || true
 "$GIT_BIN" pull --ff-only origin main
 docker compose config >/dev/null
