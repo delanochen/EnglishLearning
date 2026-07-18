@@ -26,6 +26,22 @@ chmod +x scripts/nas-deploy.sh
 /bin/sh /volume2/docker/EnglishLearning/scripts/nas-auto-update.sh
 ```
 
+更新脚本只有在以下条件全部成立后才提交“部署成功”通知：完整部署脚本退出成功、Git提交号与 `origin/main` 一致、`/api/health/live` 返回的运行版本与仓库 `package.json` 一致。没有新版本时不会通知。
+
+成功通知通过群晖原生 `synodsmnotify` 发送给管理员组。请先在“控制面板 → 通知 → 电子邮件”中完成发件服务和管理员收件地址测试，并确保系统通知允许通过邮件送达。任务脚本保持不变：
+
+```sh
+/bin/sh /volume2/docker/EnglishLearning/scripts/nas-auto-update.sh
+```
+
+如需把DSM通知发送给另一个DSM用户或群组，可在计划任务中设置目标（默认是 `@administrators`）：
+
+```sh
+AUTO_UPDATE_NOTIFY_TARGET="@administrators" /bin/sh /volume2/docker/EnglishLearning/scripts/nas-auto-update.sh
+```
+
+通知提交结果也会写入 `logs/auto-update.log`，成功通知的Git提交号保存在 `logs/last-notified-commit`。如果部署成功但邮件服务暂时不可用，后续计划任务会重试通知而不会重复部署。若日志显示找不到 `synodsmnotify`，说明当前DSM版本未提供该命令；部署本身仍会保留为成功，不会因此回滚健康容器。
+
 运行日志保存在：
 
 ```text

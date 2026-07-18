@@ -7,6 +7,11 @@ describe("NAS deployment scripts", () => {
   const autoUpdate = readFileSync("scripts/nas-auto-update.sh", "utf8");
   const wordnetImport = readFileSync("scripts/import-open-wordnet.sh", "utf8");
 
+  it("keeps the Docker backup version aligned with the website version", () => {
+    const version = JSON.parse(readFileSync("package.json", "utf8")).version;
+    expect(readFileSync("docker-compose.yml", "utf8")).toContain(`APP_VERSION: \${APP_VERSION:-${version}}`);
+  });
+
   it("uses the configured published app port for readiness checks", () => {
     expect(deploy).toContain('APP_PORT="${APP_PORT:-3000}"');
     expect(deploy).toContain('http://127.0.0.1:${APP_PORT}/api/health/ready');
@@ -64,6 +69,17 @@ describe("NAS deployment scripts", () => {
     expect(autoUpdate).toContain('scripts/nas-deploy.sh');
     expect(autoUpdate).toContain('"$GIT_BIN" status --porcelain --untracked-files=no');
     expect(autoUpdate).toContain('/var/packages/Git/target/bin');
+  });
+
+  it("notifies DSM only after the running version and commit are verified", () => {
+    expect(autoUpdate).toContain('/api/health/live');
+    expect(autoUpdate).toContain('DEPLOYED_VERSION');
+    expect(autoUpdate).toContain('EXPECTED_VERSION');
+    expect(autoUpdate.indexOf('if [ "$DEPLOYED_COMMIT" != "$REMOTE_COMMIT" ]')).toBeLessThan(autoUpdate.indexOf('notify_commit_once "$DEPLOYED_COMMIT"'));
+    expect(autoUpdate).toContain('synodsmnotify');
+    expect(autoUpdate).toContain('AUTO_UPDATE_NOTIFY_TARGET');
+    expect(autoUpdate).toContain('last-notified-commit');
+    expect(autoUpdate).toContain('Success notification will be retried on the next scheduled check.');
   });
 
   it("imports the attributed open wordnet through Docker secrets",()=>{
