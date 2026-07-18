@@ -4,7 +4,8 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { requireProfileAccess } from "@/modules/learner/access";
 import { createWeeklyPlan } from "@/modules/planning/planner";
-import { placementQuestions } from "./questions";
+import { questionsByIds } from "./questions";
+import { placementQuestionIdsFromSnapshot } from "./attempt";
 import { scorePlacement } from "./scoring";
 import { parseOptionalSpeakingAudioId } from "./submission";
 
@@ -13,16 +14,18 @@ function monday(){const value=new Date();value.setUTCHours(0,0,0,0);const day=va
 export async function submitPlacementTest(formData:FormData){
   const session=await auth();if(!session?.user.id)throw new Error("UNAUTHENTICATED");
   const profileId=String(formData.get("profileId")??"");
+  const testId=String(formData.get("testId")??"");
   const speakingAudioFileId=parseOptionalSpeakingAudioId(formData.get("speakingAudioFileId"));
   const accessible=await requireProfileAccess(session.user.id,profileId);
   if(speakingAudioFileId&&!await db.uploadedFile.findFirst({where:{id:speakingAudioFileId,learnerProfileId:profileId,familyId:accessible.familyId,status:"ACTIVE"}}))throw new Error("INVALID_SPEAKING_AUDIO");
   const learner=await db.learnerProfile.findUniqueOrThrow({where:{id:profileId}});
+  const test=await db.placementTest.findFirstOrThrow({where:{id:testId,learnerProfileId:profileId,status:"IN_PROGRESS"}});const placementQuestions=questionsByIds(placementQuestionIdsFromSnapshot(test.reportSnapshot));if(!placementQuestions.length)throw new Error("PLACEMENT_QUESTIONS_MISSING");
   const values=Object.fromEntries(placementQuestions.map(question=>[question.id,String(formData.get(question.id)??"")]));
-  const result=scorePlacement(placementQuestions,values);const version=await db.placementTest.count({where:{learnerProfileId:profileId}})+1;
+  const result=scorePlacement(placementQuestions,values);const version=test.version;
   const periodStart=monday();const periodEnd=new Date(periodStart);periodEnd.setUTCDate(periodEnd.getUTCDate()+6);
   const planVersion=await db.learningPlan.count({where:{learnerProfileId:profileId,type:"WEEKLY",periodStart}})+1;const drafts=createWeeklyPlan(learner.dailyMinutes,result.weakAreas);
   await db.$transaction(async tx=>{
-    const test=await tx.placementTest.create({data:{learnerProfileId:profileId,version,status:"COMPLETED",submittedAt:new Date(),assessedLevel:result.level,sectionScores:result.sectionScores,strengths:result.strengths,weakAreas:result.weakAreas,recommendations:result.recommendations,reportSnapshot:{total:result.total,max:result.max,ratio:result.ratio,level:result.level,speakingAudioFileId}}});
+    await tx.placementTest.update({where:{id:test.id},data:{status:"COMPLETED",submittedAt:new Date(),assessedLevel:result.level,sectionScores:result.sectionScores,strengths:result.strengths,weakAreas:result.weakAreas,recommendations:result.recommendations,reportSnapshot:{questionIds:placementQuestions.map(question=>question.id),total:result.total,max:result.max,ratio:result.ratio,level:result.level,speakingAudioFileId}}});
     await tx.placementTestAnswer.createMany({data:result.answers.map(item=>({testId:test.id,section:item.question.section,questionId:item.question.id,questionSnapshot:item.question.prompt,answer:item.answer,score:item.score,maxScore:item.question.maxScore,feedback:item.feedback}))});
     await tx.learnerProfile.update({where:{id:profileId},data:{cefrLevel:result.level,weakAreas:result.weakAreas,onboardingStatus:"READY"}});
     await tx.learningPlan.updateMany({where:{learnerProfileId:profileId,type:"WEEKLY",periodStart,status:"ACTIVE"},data:{status:"SUPERSEDED"}});
