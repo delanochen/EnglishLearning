@@ -4,16 +4,17 @@ import { db } from "@/lib/db";
 import { getAccessibleProfiles } from "@/modules/learner/access";
 import { getActiveProfile } from "@/modules/learner/selection";
 import { submitWriting } from "@/modules/writing/actions";
+import {vocabularyLevelFallbacks} from "@/modules/vocabulary/levels";
 
 export default async function WritingPage() {
   const session = await auth();
   const english = (await cookies()).get("ui_locale")?.value === "en";
   const selected = await getActiveProfile(await getAccessibleProfiles(session!.user.id));
-  const assignments = selected ? await db.writingAssignment.findMany({
-    where: { status: "PUBLISHED", ...(selected.level ? { level: selected.level } : {}) },
+  const preferredLevels=selected?.level?vocabularyLevelFallbacks(selected.level):[];const assignmentsRaw = selected ? await db.writingAssignment.findMany({
+    where: { status: "PUBLISHED", ...(preferredLevels.length ? { level:{in:preferredLevels} } : {}) },
     include: { submissions: { where: { learnerProfileId: selected.id }, include: { feedback: true }, orderBy: { version: "desc" } } },
     orderBy: { createdAt: "desc" }
-  }) : [];
+  }) : [];const rank=new Map(preferredLevels.map((level,index)=>[level,index]));const assignments=assignmentsRaw.sort((a,b)=>(rank.get(a.level)??99)-(rank.get(b.level)??99));
 
   const t = english ? { title: "Writing practice", target: "Target", words: "words", revise: "Submit revision", submit: "Submit for feedback", version: "Version", feedback: "feedback", grammar: "Grammar", spelling: "Spelling", vocabulary: "Vocabulary", structure: "Structure", naturalness: "Naturalness", issues: "Detailed issues and suggestions", full: "Whole text", suggestion: "Suggestion", rewrite: "View suggested rewrite", saved: "saved versions", empty: "No writing assignments are available for this level yet." } : { title: "写作练习", target: "目标", words: "词", revise: "提交新版本", submit: "提交并批改", version: "第", feedback: "版反馈", grammar: "语法", spelling: "拼写", vocabulary: "词汇", structure: "结构", naturalness: "自然度", issues: "逐条问题与修改建议", full: "全文建议", suggestion: "建议", rewrite: "查看参考改写", saved: "个已保存版本", empty: "当前级别还没有写作题目。" };
   return <div className="mx-auto max-w-5xl">

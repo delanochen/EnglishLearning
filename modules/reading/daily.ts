@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { routedStructured } from "@/modules/ai/gateway";
 import { readingArticleSchema } from "@/modules/ai/content-schemas";
+import {vocabularyLevelFallbacks} from "@/modules/vocabulary/levels";
 
 const wordCounts = { PRE_A1: 100, A1: 140, A2: 220, B1: 350, B2: 520, C1: 700, C2: 900 } as const;
 
@@ -55,10 +56,8 @@ export async function ensureDailyReading(userId: string, learnerProfileId: strin
     articleId = article.id;
   } catch {
     generationSource = "LIBRARY_FALLBACK";
-    const fallback = await db.readingArticle.findFirst({
-      where: { status: "PUBLISHED", level: learner.cefrLevel, progress: { none: { learnerProfileId } } },
-      orderBy: { createdAt: "desc" }
-    });
+    const levels=vocabularyLevelFallbacks(learner.cefrLevel);let fallback=null;
+    for(const level of levels){fallback=await db.readingArticle.findFirst({where:{status:"PUBLISHED",level},orderBy:{createdAt:"desc"}});if(fallback)break}
     if (!fallback) return null;
     articleId = fallback.id;
   }

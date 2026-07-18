@@ -7,6 +7,7 @@ import { getAccessibleProfiles } from "@/modules/learner/access";
 import { getActiveProfile } from "@/modules/learner/selection";
 import { updateVocabularyGoal } from "@/modules/vocabulary/actions";
 import { vocabularyLevelFallbacks } from "@/modules/vocabulary/levels";
+import { ensureChineseVocabularyMeanings } from "@/modules/vocabulary/meanings";
 
 export default async function VocabularyPage() {
   const session = await auth();
@@ -15,14 +16,16 @@ export default async function VocabularyPage() {
   const learner = selected ? await db.learnerProfile.findUnique({ where: { id: selected.id }, select: { cefrLevel: true, dailyVocabularyGoal: true } }) : null;
   const now = new Date();
   const preferredLevels=learner?.cefrLevel?vocabularyLevelFallbacks(learner.cefrLevel):[];
-  const availableWords = learner?.cefrLevel ? await db.vocabulary.findMany({
+  let availableWords = learner?.cefrLevel ? await db.vocabulary.findMany({
     where: { status: "PUBLISHED", level: {in:preferredLevels}, ...(selected ? { OR: [{ progress: { some: { learnerProfileId: selected.id, nextReviewAt: { lte: now } } } }, { progress: { some: { learnerProfileId: selected.id, nextReviewAt: null } } }, { progress: { none: { learnerProfileId: selected.id } } }] } : {}) },
     include: { meanings: true, examples: true, relationsFrom: { include: { target: true } }, progress: selected ? { where: { learnerProfileId: selected.id } } : false },
     orderBy: [{ topic: "asc" }, { word: "asc" }],
     take: (learner?.dailyVocabularyGoal ?? 10)*preferredLevels.length
   }) : [];
+  if(learner?.cefrLevel&&selected&&availableWords.length<learner.dailyVocabularyGoal){const recycled=await db.vocabulary.findMany({where:{status:"PUBLISHED",level:{in:preferredLevels},id:{notIn:availableWords.map(word=>word.id)}},include:{meanings:true,examples:true,relationsFrom:{include:{target:true}},progress:{where:{learnerProfileId:selected.id}}},orderBy:[{updatedAt:"asc"}],take:(learner.dailyVocabularyGoal-availableWords.length)*preferredLevels.length});availableWords=[...availableWords,...recycled]}
   const levelRank=new Map(preferredLevels.map((level,index)=>[level,index]));
   const words=availableWords.sort((a,b)=>(levelRank.get(a.level)??99)-(levelRank.get(b.level)??99)).slice(0,learner?.dailyVocabularyGoal??10);
+  const chineseMeanings=english?new Map<string,string>():await ensureChineseVocabularyMeanings(words,session!.user.id);
   const t = english
     ? { title: "Vocabulary learning and review", help: `Your suggested batch follows your ${learner?.cefrLevel?.replace("_", "-") ?? "placement-pending"} level. Finishing a batch never stops you from learning more.`,goal:"Words per batch",save:"Update goal",noZh: "No Chinese explanation", empty: "No vocabulary is due for this level today." }
     : { title: "单词学习与复习", help: `每组数量只是自定义学习目标，不是每日上限；完成后仍可继续下一组。优先选择测试等级 ${learner?.cefrLevel?.replace("_", "-") ?? "待测试"}，不足时由相邻等级补充。`,goal:"每组单词数量",save:"更新目标", noZh: "暂无中文解释", empty: "词库中还没有可用单词，请先由管理员导入或发布词条。" };
@@ -36,7 +39,7 @@ export default async function VocabularyPage() {
       phonetic: word.phonetic,
       partOfSpeech: word.partOfSpeech ?? "word",
       definitionEn: word.definitionEn,
-      meaning: word.meanings[0]?.definition ?? t.noZh,
+      meaning: word.meanings.find(item=>item.locale==="zh-CN")?.definition ?? chineseMeanings.get(word.id) ?? t.noZh,
       topic: word.topic,
       state: progress?.state ?? "NEW",
       mastery: progress?.mastery ?? 0,

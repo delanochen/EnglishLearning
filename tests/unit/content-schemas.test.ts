@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { dailyTaskOutputSchema, placementReportSchema, readingArticleSchema, scenarioCourseSchema, vocabularyCourseSchema, weeklyPlanOutputSchema } from "@/modules/ai/content-schemas";
+import { dailyTaskOutputSchema, placementReportSchema, readingArticleSchema, scenarioCourseSchema, vocabularyCourseSchema, vocabularyTranslationsSchema, weeklyPlanOutputSchema } from "@/modules/ai/content-schemas";
 
 describe("AI content schemas", () => {
+  it("validates cached Chinese vocabulary translations",()=>{
+    expect(vocabularyTranslationsSchema.parse({translations:[{id:"11111111-1111-4111-8111-111111111111",definitionZh:"降低某人的自尊"}]}).translations[0]?.definitionZh).toContain("自尊");
+  });
   it("normalizes common DeepSeek reading field aliases",()=>{
     const payload={article:{title:"High school",content:"Students arrive early for classes and spend the day learning, joining clubs, meeting friends, and preparing carefully for future opportunities in their community.",level:"B1",target_audience:"teens",theme:"school",target_vocabulary:["club"],target_grammar:["present simple"],abstract:"A school day."},questions:[{type:"multiple-choice",question:"Where are the students?",options:["School","Home"],correct_answer:"School",rationale:"The passage says so."},{type:"true-false",question:"They study.",correct_answer:"True"},{type:"short-answer",question:"Name one activity.",correct_answer:"Joining clubs"}]};
     const parsed=readingArticleSchema.parse(payload);

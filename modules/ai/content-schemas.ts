@@ -1,6 +1,7 @@
 import { z } from "zod";
 const level = z.enum(["PRE_A1", "A1", "A2", "B1", "B2", "C1", "C2"]);
 export const vocabularyCourseSchema = z.object({ word: z.string().min(1), phonetic: z.string(), partOfSpeech: z.string(), definitionEn: z.string(), definitionZh: z.string(), level, topic: z.string(), collocations: z.array(z.string()), synonyms: z.array(z.string()), antonyms: z.array(z.string()), examples: z.array(z.object({ sentence: z.string(), translation: z.string() })).min(1) });
+export const vocabularyTranslationsSchema=z.object({translations:z.array(z.object({id:z.string().uuid(),definitionZh:z.string().trim().min(1).max(500)})).min(1).max(100)});
 const questionTypes=["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "VOCABULARY", "FILL_BLANK", "ERROR_CORRECTION", "REORDER", "TRANSLATION", "SENTENCE_CREATION", "AI_DIALOGUE"] as const;
 function record(value:unknown):Record<string,unknown>{return value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{}}
 function first(source:Record<string,unknown>,...keys:string[]){for(const key of keys)if(source[key]!==undefined)return source[key]}
