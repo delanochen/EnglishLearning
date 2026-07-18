@@ -23,7 +23,7 @@ function learningHref(taskType: string, taskId: string) {
 
 export default async function TasksPage() {
   const session = await auth(); const english = (await cookies()).get("ui_locale")?.value === "en"; const selected = await getActiveProfile(await getAccessibleProfiles(session!.user.id)); if (selected) await ensureDailyTasks(session!.user.id, selected.id); const today = new Date(); const taskDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-  const tasks = selected ? await db.dailyTask.findMany({ where: { learnerProfileId: selected.id, taskDate }, include: { completions: true }, orderBy: { createdAt: "asc" } }) : [];
+  const tasks = selected ? await db.dailyTask.findMany({ where: { learnerProfileId: selected.id, OR:[{status:{in:["PENDING","IN_PROGRESS","SKIPPED"]}},{taskDate}] }, include: { completions: true }, orderBy: { createdAt: "asc" } }) : [];
   const learner = selected ? await db.learnerProfile.findUnique({ where: { id: selected.id }, include: { studyStreak: true, achievements: { include: { achievement: true }, orderBy: { earnedAt: "desc" } } } }) : null; const mode = learner?.studyStreak; const vacation = mode?.vacationUntil && mode.vacationUntil >= taskDate;
   const taskCopy: Record<string, { title: string; description: string }> = {
     VOCABULARY: { title: "Vocabulary study and review", description: "Review due words and learn new vocabulary" },

@@ -5,17 +5,19 @@ import { db } from "@/lib/db";
 import { getAccessibleProfiles } from "@/modules/learner/access";
 import { getActiveProfile } from "@/modules/learner/selection";
 import { xpLevel } from "@/modules/achievements/level";
+import { ensureDailyTasks } from "@/modules/tasks/service";
 
 export default async function Dashboard() {
   const session = await auth();
   const english = (await cookies()).get("ui_locale")?.value === "en";
   const selected = await getActiveProfile(await getAccessibleProfiles(session!.user.id));
+  if(selected)await ensureDailyTasks(session!.user.id,selected.id);
   const now = new Date();
   const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const [learner, activities, tasks, recentWords, mistakes] = selected ? await Promise.all([
     db.learnerProfile.findUnique({ where: { id: selected.id }, include: { studyStreak: { include: { events: { orderBy: { studyDate: "desc" }, take: 14 } } }, achievements: { where: { earnedAt: { not: null } }, include: { achievement: true }, orderBy: { earnedAt: "desc" }, take: 3 } } }),
     db.learningActivity.findMany({ where: { learnerProfileId: selected.id, occurredAt: { gte: todayStart } }, orderBy: { occurredAt: "desc" } }),
-    db.dailyTask.findMany({ where: { learnerProfileId: selected.id, taskDate: todayStart } }),
+    db.dailyTask.findMany({ where: { learnerProfileId: selected.id, OR:[{status:{in:["PENDING","IN_PROGRESS","SKIPPED"]}},{taskDate:todayStart}] } }),
     db.userVocabularyProgress.findMany({ where: { learnerProfileId: selected.id }, take: 5, orderBy: { updatedAt: "desc" }, include: { vocabulary: true } }),
     db.mistakeRecord.findMany({ where: { learnerProfileId: selected.id, status: "OPEN" }, take: 5, orderBy: { updatedAt: "desc" } }),
   ]) : [null, [], [], [], []];

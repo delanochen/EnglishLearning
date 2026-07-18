@@ -6,7 +6,6 @@ import { VocabularyGame } from "@/components/vocabulary-game";
 import { getAccessibleProfiles } from "@/modules/learner/access";
 import { getActiveProfile } from "@/modules/learner/selection";
 import { updateVocabularyGoal } from "@/modules/vocabulary/actions";
-import { vocabularyLevelFallbacks } from "@/modules/vocabulary/levels";
 import { ensureChineseVocabularyMeanings } from "@/modules/vocabulary/meanings";
 
 export default async function VocabularyPage() {
@@ -15,20 +14,19 @@ export default async function VocabularyPage() {
   const selected = await getActiveProfile(await getAccessibleProfiles(session!.user.id));
   const learner = selected ? await db.learnerProfile.findUnique({ where: { id: selected.id }, select: { cefrLevel: true, dailyVocabularyGoal: true } }) : null;
   const now = new Date();
-  const preferredLevels=learner?.cefrLevel?vocabularyLevelFallbacks(learner.cefrLevel):[];
+  const exactLevel=learner?.cefrLevel;
   let availableWords = learner?.cefrLevel ? await db.vocabulary.findMany({
-    where: { status: "PUBLISHED", level: {in:preferredLevels}, ...(selected ? { OR: [{ progress: { some: { learnerProfileId: selected.id, nextReviewAt: { lte: now } } } }, { progress: { some: { learnerProfileId: selected.id, nextReviewAt: null } } }, { progress: { none: { learnerProfileId: selected.id } } }] } : {}) },
+    where: { status: "PUBLISHED", level: exactLevel!, ...(selected ? { OR: [{ progress: { some: { learnerProfileId: selected.id, nextReviewAt: { lte: now } } } }, { progress: { some: { learnerProfileId: selected.id, nextReviewAt: null } } }, { progress: { none: { learnerProfileId: selected.id } } }] } : {}) },
     include: { meanings: true, examples: true, relationsFrom: { include: { target: true } }, progress: selected ? { where: { learnerProfileId: selected.id } } : false },
     orderBy: [{ topic: "asc" }, { word: "asc" }],
-    take: (learner?.dailyVocabularyGoal ?? 10)*preferredLevels.length
+    take: learner?.dailyVocabularyGoal ?? 10
   }) : [];
-  if(learner?.cefrLevel&&selected&&availableWords.length<learner.dailyVocabularyGoal){const recycled=await db.vocabulary.findMany({where:{status:"PUBLISHED",level:{in:preferredLevels},id:{notIn:availableWords.map(word=>word.id)}},include:{meanings:true,examples:true,relationsFrom:{include:{target:true}},progress:{where:{learnerProfileId:selected.id}}},orderBy:[{updatedAt:"asc"}],take:(learner.dailyVocabularyGoal-availableWords.length)*preferredLevels.length});availableWords=[...availableWords,...recycled]}
-  const levelRank=new Map(preferredLevels.map((level,index)=>[level,index]));
-  const words=availableWords.sort((a,b)=>(levelRank.get(a.level)??99)-(levelRank.get(b.level)??99)).slice(0,learner?.dailyVocabularyGoal??10);
+  if(learner?.cefrLevel&&selected&&availableWords.length<learner.dailyVocabularyGoal){const recycled=await db.vocabulary.findMany({where:{status:"PUBLISHED",level:learner.cefrLevel,id:{notIn:availableWords.map(word=>word.id)}},include:{meanings:true,examples:true,relationsFrom:{include:{target:true}},progress:{where:{learnerProfileId:selected.id}}},orderBy:[{updatedAt:"asc"}],take:learner.dailyVocabularyGoal-availableWords.length});availableWords=[...availableWords,...recycled]}
+  const words=availableWords.slice(0,learner?.dailyVocabularyGoal??10);
   const chineseMeanings=english?new Map<string,string>():await ensureChineseVocabularyMeanings(words,session!.user.id);
   const t = english
     ? { title: "Vocabulary learning and review", help: `Your suggested batch follows your ${learner?.cefrLevel?.replace("_", "-") ?? "placement-pending"} level. Finishing a batch never stops you from learning more.`,goal:"Words per batch",save:"Update goal",noZh: "No Chinese explanation", empty: "No vocabulary is due for this level today." }
-    : { title: "单词学习与复习", help: `每组数量只是自定义学习目标，不是每日上限；完成后仍可继续下一组。优先选择测试等级 ${learner?.cefrLevel?.replace("_", "-") ?? "待测试"}，不足时由相邻等级补充。`,goal:"每组单词数量",save:"更新目标", noZh: "暂无中文解释", empty: "词库中还没有可用单词，请先由管理员导入或发布词条。" };
+    : { title: "单词学习与复习", help: `每组数量只是自定义学习目标，不是每日上限；完成后仍可继续下一组。只使用当前成员测试等级 ${learner?.cefrLevel?.replace("_", "-") ?? "待测试"} 的单词，不混入相邻等级。`,goal:"每组单词数量",save:"更新目标", noZh: "暂无中文解释", empty: "当前准确等级的词库还没有可用单词，请先导入该等级词条。" };
 
   const slides = words.map((word) => {
     const progress = word.progress[0];

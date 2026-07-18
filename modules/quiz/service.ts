@@ -1,6 +1,5 @@
 import { db } from "@/lib/db";
 import { requireProfileAccess } from "@/modules/learner/access";
-import {vocabularyLevelFallbacks} from "@/modules/vocabulary/levels";
 
 function rotate<T>(items: T[], offset: number) { return items.map((_, index) => items[(index + offset) % items.length]); }
 
@@ -12,10 +11,9 @@ export async function ensureQuizSession(userId: string, taskId: string) {
   if (existing) return existing;
   const learner = await db.learnerProfile.findUniqueOrThrow({ where: { id: task.learnerProfileId } });
   const vocabularyInclude = { meanings: { where: { locale: "zh-CN" }, orderBy: { senseOrder: "asc" as const }, take: 1 }, progress: { where: { learnerProfileId: learner.id } } };
-  const levels=learner.cefrLevel?vocabularyLevelFallbacks(learner.cefrLevel):[];
-  const learnedWords = await db.vocabulary.findMany({ where: { status: "PUBLISHED", ...(levels.length ? { level:{in:levels} } : {}), meanings: { some: { locale: "zh-CN" } }, progress: { some: { learnerProfileId: learner.id } } }, include: vocabularyInclude, orderBy: { word: "asc" }, take: 12 });
-  const fallbackWords = learnedWords.length >= 7 ? [] : await db.vocabulary.findMany({ where: { status: "PUBLISHED", ...(levels.length ? { level:{in:levels} } : {}), id: { notIn: learnedWords.map((word) => word.id) }, meanings: { some: { locale: "zh-CN" } } }, include: vocabularyInclude, orderBy: { word: "asc" }, take: 12 - learnedWords.length });
-  const words = [...learnedWords, ...fallbackWords];
+  const learnedWords = await db.vocabulary.findMany({ where: { status: "PUBLISHED", ...(learner.cefrLevel ? { level:learner.cefrLevel } : {}), meanings: { some: { locale: "zh-CN" } }, progress: { some: { learnerProfileId: learner.id } } }, include: vocabularyInclude, orderBy: { word: "asc" }, take: 12 });
+  const supplementalWords = learnedWords.length >= 7 ? [] : await db.vocabulary.findMany({ where: { status: "PUBLISHED", ...(learner.cefrLevel ? { level:learner.cefrLevel } : {}), id: { notIn: learnedWords.map((word) => word.id) }, meanings: { some: { locale: "zh-CN" } } }, include: vocabularyInclude, orderBy: { word: "asc" }, take: 12 - learnedWords.length });
+  const words = [...learnedWords, ...supplementalWords];
   const mistakes = await db.mistakeRecord.findMany({ where: { learnerProfileId: learner.id, status: "OPEN" }, orderBy: { updatedAt: "desc" }, take: 3 });
   const pool = words.map((word) => word.meanings[0]!.definition);
   const questions: Array<{ type: string; prompt: string; options: string[]; answerKey: string; explanation: string | null; order: number }> = words.slice(0, Math.min(7, words.length)).map((word, index) => {

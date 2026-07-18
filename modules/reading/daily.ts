@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import { routedStructured } from "@/modules/ai/gateway";
 import { readingArticleSchema } from "@/modules/ai/content-schemas";
-import {vocabularyLevelFallbacks} from "@/modules/vocabulary/levels";
 
 const wordCounts = { PRE_A1: 100, A1: 140, A2: 220, B1: 350, B2: 520, C1: 700, C2: 900 } as const;
 
@@ -12,9 +11,10 @@ function todayUtc() {
 
 export async function ensureDailyReading(userId: string, learnerProfileId: string) {
   const assignmentDate = todayUtc();
-  const existing = await db.dailyReadingAssignment.findUnique({
-    where: { learnerProfileId_assignmentDate: { learnerProfileId, assignmentDate } },
+  const existing = await db.dailyReadingAssignment.findFirst({
+    where: { learnerProfileId, article: { progress: { none: { learnerProfileId, completedAt: { not: null } } } } },
     include: { article: { include: { progress: { where: { learnerProfileId } } } } }
+    ,orderBy:{createdAt:"desc"}
   });
   if (existing) return existing;
 
@@ -25,7 +25,7 @@ export async function ensureDailyReading(userId: string, learnerProfileId: strin
   if (!learner.cefrLevel) return null;
 
   let articleId: string | undefined;
-  let generationSource = "AI";
+  const generationSource = "AI";
   try {
     const request = {
       level: learner.cefrLevel,
@@ -55,15 +55,11 @@ export async function ensureDailyReading(userId: string, learnerProfileId: strin
     });
     articleId = article.id;
   } catch {
-    generationSource = "LIBRARY_FALLBACK";
-    const levels=vocabularyLevelFallbacks(learner.cefrLevel);let fallback=null;
-    for(const level of levels){fallback=await db.readingArticle.findFirst({where:{status:"PUBLISHED",level},orderBy:{createdAt:"desc"}});if(fallback)break}
-    if (!fallback) return null;
-    articleId = fallback.id;
+    return null;
   }
+  if(!articleId)return null;
 
-  try {
-    return await db.dailyReadingAssignment.create({
+  return db.dailyReadingAssignment.create({
       data: { learnerProfileId, articleId, assignmentDate, generationSource },
       include: {
         article: {
@@ -71,14 +67,4 @@ export async function ensureDailyReading(userId: string, learnerProfileId: strin
         }
       }
     });
-  } catch {
-    return db.dailyReadingAssignment.findUnique({
-      where: { learnerProfileId_assignmentDate: { learnerProfileId, assignmentDate } },
-      include: {
-        article: {
-          include: { progress: { where: { learnerProfileId } } }
-        }
-      }
-    });
-  }
 }

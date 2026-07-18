@@ -738,7 +738,7 @@ model DailyReadingAssignment {
   learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
   article          ReadingArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
-  @@unique([learnerProfileId, assignmentDate])
+  @@index([learnerProfileId, assignmentDate, createdAt])
   @@index([articleId])
 }
 
