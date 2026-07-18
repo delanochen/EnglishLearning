@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
 import { createGrammarTopic, createListeningExercise, createReadingArticle, createScenarioLesson, createVocabulary, createWritingAssignment, updateContentStatus } from "@/modules/admin/actions";
 
-const levels = ["PRE_A1", "A1", "A2", "B1", "B2", "C1"];
+const levels = ["PRE_A1", "A1", "A2", "B1", "B2", "C1", "C2"];
 export default async function AdminContentPage() {
   await requireSystemAdmin();
   const english = (await cookies()).get("ui_locale")?.value === "en";

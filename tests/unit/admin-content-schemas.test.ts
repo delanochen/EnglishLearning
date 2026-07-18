@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { contentEditSchema, csv, grammarPublishReadiness, listeningContentSchema, listeningPublishReadiness, listeningQuestionSchema, parseContrastLines, readingContentSchema, readingPublishReadiness, scenarioExerciseSchema, scenarioPublishReadiness, vocabularyPublishReadiness, writingAssignmentSchema, writingPublishReadiness } from "@/modules/admin/content-schemas";
 
 describe("admin content schemas", () => {
+  it("supports C2 content", () => {
+    expect(readingContentSchema.parse({ title: "Advanced discourse", body: "This is a sufficiently long and nuanced graded reading passage.", level: "C2", audience: "adult", topic: "society" }).level).toBe("C2");
+  });
   it("normalizes target lists for manually authored reading lessons", () => {
     expect(csv(" travel, check in, , luggage ")).toEqual(["travel", "check in", "luggage"]);
     expect(readingContentSchema.parse({ title: "Airport", body: "This is a sufficiently long graded reading passage.", level: "A2", audience: "adult", topic: "travel" }).level).toBe("A2");

@@ -7,7 +7,7 @@ import { addListeningQuestion, deleteListeningQuestion, updateContentStatus, upd
 import { listeningPublishReadiness } from "@/modules/admin/content-schemas";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
 
-const levels = ["PRE_A1", "A1", "A2", "B1", "B2", "C1"];
+const levels = ["PRE_A1", "A1", "A2", "B1", "B2", "C1", "C2"];
 
 export default async function ListeningEditorPage({ params }: { params: Promise<{ id: string }> }) {
   await requireSystemAdmin(); const english = (await cookies()).get("ui_locale")?.value === "en"; const { id } = await params;

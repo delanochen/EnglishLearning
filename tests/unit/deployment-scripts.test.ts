@@ -34,7 +34,7 @@ describe("NAS deployment scripts", () => {
   });
 
   it("updates deployment scripts before taking the pre-upgrade data backup", () => {
-    expect(deploy.indexOf("git pull --ff-only origin main")).toBeLessThan(deploy.indexOf("Creating pre-upgrade backup"));
+    expect(deploy.indexOf('"$GIT_BIN" pull --ff-only origin main')).toBeLessThan(deploy.indexOf("Creating pre-upgrade backup"));
     expect(deploy.indexOf("docker compose config >/dev/null")).toBeLessThan(deploy.indexOf("Creating pre-upgrade backup"));
   });
 
@@ -55,10 +55,11 @@ describe("NAS deployment scripts", () => {
   });
 
   it("auto-updates only when GitHub has a new commit and uses a deployment lock", () => {
-    expect(autoUpdate).toContain('git fetch origin main');
+    expect(autoUpdate).toContain('"$GIT_BIN" fetch origin main');
     expect(autoUpdate).toContain('mkdir "$LOCK_DIR"');
     expect(autoUpdate).toContain('scripts/nas-deploy.sh');
-    expect(autoUpdate).toContain('git status --porcelain --untracked-files=no');
+    expect(autoUpdate).toContain('"$GIT_BIN" status --porcelain --untracked-files=no');
+    expect(autoUpdate).toContain('/var/packages/Git/target/bin');
   });
 
   it("imports the attributed open wordnet through Docker secrets",()=>{

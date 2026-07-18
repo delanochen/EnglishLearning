@@ -6,7 +6,7 @@ import { requireSystemAdmin } from "@/modules/authorization/require-admin";
 import { addScenarioDialogue, addScenarioExercise, addScenarioVocabulary, deleteScenarioItem, updateContentStatus, updateScenarioMetadata } from "@/modules/admin/actions";
 import { scenarioPublishReadiness } from "@/modules/admin/content-schemas";
 
-const levels = ["PRE_A1", "A1", "A2", "B1", "B2", "C1"];
+const levels = ["PRE_A1", "A1", "A2", "B1", "B2", "C1", "C2"];
 
 export default async function ScenarioEditorPage({ params }: { params: Promise<{ id: string }> }) {
   await requireSystemAdmin();

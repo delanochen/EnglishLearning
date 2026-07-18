@@ -6,7 +6,7 @@ import { updateContentStatus, updateWritingAssignment } from "@/modules/admin/ac
 import { writingPublishReadiness } from "@/modules/admin/content-schemas";
 import { requireSystemAdmin } from "@/modules/authorization/require-admin";
 
-const levels=["PRE_A1","A1","A2","B1","B2","C1"];
+const levels=["PRE_A1","A1","A2","B1","B2","C1","C2"];
 const types=["SENTENCES","PARAGRAPH","EMAIL","HIGH_SCHOOL_ESSAY","JOURNAL","IMAGE_DESCRIPTION","OPINION","WORKPLACE"];
 export default async function WritingEditorPage({params}:{params:Promise<{id:string}>}){
   await requireSystemAdmin();const english=(await cookies()).get("ui_locale")?.value==="en";const {id}=await params;const assignment=await db.writingAssignment.findUnique({where:{id},include:{_count:{select:{submissions:true}}}});if(!assignment)notFound();const missing=writingPublishReadiness(assignment);

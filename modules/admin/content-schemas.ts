@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const contentTypeSchema = z.enum(["vocabulary", "reading", "grammar", "scenario", "listening"]);
-export const cefrSchema = z.enum(["PRE_A1", "A1", "A2", "B1", "B2", "C1"]);
+export const cefrSchema = z.enum(["PRE_A1", "A1", "A2", "B1", "B2", "C1", "C2"]);
 
 export const readingContentSchema = z.object({
   title: z.string().trim().min(1).max(160), body: z.string().trim().min(10).max(30_000), translation: z.string().trim().max(30_000).optional(),

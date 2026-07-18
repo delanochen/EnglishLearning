@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { routedStructured } from "@/modules/ai/gateway";
 import { readingArticleSchema } from "@/modules/ai/content-schemas";
 
-const wordCounts = { PRE_A1: 100, A1: 140, A2: 220, B1: 350, B2: 520, C1: 700 } as const;
+const wordCounts = { PRE_A1: 100, A1: 140, A2: 220, B1: 350, B2: 520, C1: 700, C2: 900 } as const;
 
 function todayUtc() {
   const now = new Date();

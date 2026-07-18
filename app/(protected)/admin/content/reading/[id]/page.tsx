@@ -6,7 +6,7 @@ import { requireSystemAdmin } from "@/modules/authorization/require-admin";
 import { addReadingQuestion, deleteReadingQuestion, updateContentStatus, updateReadingMetadata } from "@/modules/admin/actions";
 import { readingPublishReadiness } from "@/modules/admin/content-schemas";
 
-const levels = ["PRE_A1", "A1", "A2", "B1", "B2", "C1"];
+const levels = ["PRE_A1", "A1", "A2", "B1", "B2", "C1", "C2"];
 const questionTypes = ["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "VOCABULARY"];
 
 export default async function ReadingEditorPage({ params }: { params: Promise<{ id: string }> }) {

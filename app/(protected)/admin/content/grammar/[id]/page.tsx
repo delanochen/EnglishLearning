@@ -6,7 +6,7 @@ import { requireSystemAdmin } from "@/modules/authorization/require-admin";
 import { addGrammarExample, addGrammarExercise, deleteGrammarItem, updateContentStatus, updateGrammarMetadata } from "@/modules/admin/actions";
 import { grammarPublishReadiness } from "@/modules/admin/content-schemas";
 
-const levels = ["PRE_A1", "A1", "A2", "B1", "B2", "C1"];
+const levels = ["PRE_A1", "A1", "A2", "B1", "B2", "C1", "C2"];
 const types = ["MULTIPLE_CHOICE", "FILL_BLANK", "ERROR_CORRECTION", "REORDER", "TRANSLATION", "SENTENCE_CREATION", "AI_DIALOGUE"];
 
 export default async function GrammarEditorPage({ params }: { params: Promise<{ id: string }> }) {

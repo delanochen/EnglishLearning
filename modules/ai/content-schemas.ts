@@ -1,5 +1,5 @@
 import { z } from "zod";
-const level = z.enum(["PRE_A1", "A1", "A2", "B1", "B2", "C1"]);
+const level = z.enum(["PRE_A1", "A1", "A2", "B1", "B2", "C1", "C2"]);
 export const vocabularyCourseSchema = z.object({ word: z.string().min(1), phonetic: z.string(), partOfSpeech: z.string(), definitionEn: z.string(), definitionZh: z.string(), level, topic: z.string(), collocations: z.array(z.string()), synonyms: z.array(z.string()), antonyms: z.array(z.string()), examples: z.array(z.object({ sentence: z.string(), translation: z.string() })).min(1) });
 export const readingQuestionSchema = z.object({ type: z.enum(["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "VOCABULARY", "FILL_BLANK", "ERROR_CORRECTION", "REORDER", "TRANSLATION", "SENTENCE_CREATION", "AI_DIALOGUE"]), prompt: z.string(), options: z.array(z.string()).optional(), answerKey: z.string(), explanation: z.string() });
 export const readingArticleSchema = z.object({ title: z.string(), body: z.string().min(100), translation: z.string().optional(), level, audience: z.string(), topic: z.string(), targetVocabulary: z.array(z.string()), targetGrammar: z.array(z.string()), summary: z.string(), questions: z.array(readingQuestionSchema).min(3), oralRetellingPrompt: z.string(), writingExtensionPrompt: z.string() });
