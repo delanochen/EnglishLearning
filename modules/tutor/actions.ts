@@ -9,6 +9,7 @@ import { routedChat } from "@/modules/ai/gateway";
 import { requireProfileAccess } from "@/modules/learner/access";
 import { completeTodayTaskForModule } from "@/modules/tasks/module-completion";
 import { buildTutorSystemPrompt, tutorUnavailableMessage } from "./prompt";
+import { tutorPracticeProgress } from "./completion";
 
 const createSchema = z.object({ profileId: z.string().uuid(), topic: z.string().trim().min(2).max(120), teacherStyle: z.enum(["GENTLE", "STRICT", "CHILD", "ACADEMIC", "US_LIFE", "WORKPLACE"]) });
 const messageSchema = z.object({ conversationId: z.string().uuid(), content: z.string().trim().min(1).max(4000) });
@@ -42,7 +43,11 @@ export async function sendTutorMessage(formData: FormData) {
     db.aIConversation.update({ where: { id: conversation.id }, data: { lastMessageAt: new Date() } }),
     db.learningActivity.create({ data: { learnerProfileId: conversation.learnerProfileId, familyId: accessibleProfile.familyId, activityType: "AI_CHAT", module: "TUTOR", sourceType: "AIConversation", sourceId: conversation.id } })
   ]);
-  await completeTodayTaskForModule(session.user.id, conversation.learnerProfileId, "AI_TUTOR");
+  const progress = tutorPracticeProgress([...conversation.messages, { role: "user", content: input.content }]);
+  if (progress.complete) {
+    const durationSeconds = Math.max(1, Math.min(7200, Math.round((Date.now() - conversation.createdAt.getTime()) / 1000)));
+    await completeTodayTaskForModule(session.user.id, conversation.learnerProfileId, "AI_TUTOR", undefined, durationSeconds);
+  }
   revalidatePath("/learn/tutor");
 }
 
