@@ -120,6 +120,7 @@ if [ "$LOCAL_COMMIT" = "$REMOTE_COMMIT" ]; then
 fi
 
 echo "Deploying $LOCAL_COMMIT -> $REMOTE_COMMIT"
+"$GIT_BIN" pull --ff-only origin main
 /bin/sh "$PROJECT_DIR/scripts/nas-deploy.sh"
 DEPLOYED_COMMIT="$("$GIT_BIN" rev-parse HEAD)"
 
