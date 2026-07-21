@@ -132,6 +132,15 @@ Redis 使用 AOF 并持久化到 `./data/redis`。Worker 使用 `./content-cache
 
 阶段 5 API：`GET/POST /api/admin/content/licenses`、`GET/POST /api/admin/content/sources`、`POST /api/admin/content/import`。所有接口均要求系统管理员权限。
 
+## 阶段 6 首次初始化
+
+- 容器完成数据库迁移后、运行演示 seed 前执行 `scripts/init-content-library.ts`。只有词汇、阅读、语法、场景四类内容库全部为空时才自动建立计划。
+- 空库计划共 6,661 条：词汇 6,300、阅读 320、语法 18、美国生活场景 23。词汇和阅读按指定 CEFR 分开建任务；语法与场景使用逐项主题规格，避免重复生成同一个泛化主题。
+- 自动启动只创建 `PENDING` 任务，不进行昂贵的 AI 调用。系统管理员在 `/admin/content-initialization` 核对预算并输入 `START` 后才批量启动。
+- 任务沿用数据库状态机及 BullMQ Worker，以 20 条为一批断点续传。未完成条目保留，已完成条目不会再次领取；暂停、恢复、取消和失败重试沿用内容任务控制接口。
+- `GET /api/admin/content/initialize` 返回汇总进度；`POST` 的 `PLAN` 操作扫描库存并补齐计划，`START` 操作必须携带精确确认词 `START`。两个接口均要求系统管理员权限。
+- 所有生成结果仍先经过 Zod、规则质量、AI 质量及去重检查，只保存为 `DRAFT` 或 `REVIEW_REQUIRED`，初始化不改变发布安全边界。
+
 ## 对现有模块的影响
 
 - 现有学习页面只查询 PUBLISHED 内容，行为保持不变。

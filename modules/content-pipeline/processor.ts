@@ -10,7 +10,8 @@ import { evaluatePersistedContent } from "./quality-service";
 export async function prepareContentJob(jobId:string,batchSize=20){
   const job=await db.contentGenerationJob.findUnique({where:{id:jobId},include:{_count:{select:{items:true}}}});if(!job)throw new Error("CONTENT_JOB_NOT_FOUND");if(job._count.items>0)return job;
   const batches=planContentBatches(job.totalItems,batchSize);
-  await db.$transaction(async tx=>{for(const batch of batches){const row=await tx.contentGenerationBatch.create({data:{jobId,sequence:batch.sequence,totalItems:batch.count}});await tx.contentGenerationItem.createMany({data:Array.from({length:batch.count},(_,offset)=>({jobId,batchId:row.id,sequence:batch.start+offset+1,contentType:job.type,input:{...(job.configuration&&typeof job.configuration==="object"?job.configuration as object:{}),sequence:batch.start+offset+1}}))})}});
+  const configuration=job.configuration&&typeof job.configuration==="object"&&!Array.isArray(job.configuration)?job.configuration as Record<string,unknown>:{};const specs=Array.isArray(configuration.itemSpecs)?configuration.itemSpecs:[];const baseConfiguration={...configuration};delete baseConfiguration.itemSpecs;
+  await db.$transaction(async tx=>{for(const batch of batches){const row=await tx.contentGenerationBatch.create({data:{jobId,sequence:batch.sequence,totalItems:batch.count}});await tx.contentGenerationItem.createMany({data:Array.from({length:batch.count},(_,offset)=>{const sequence=batch.start+offset+1;const spec=specs.length&&specs[(sequence-1)%specs.length]&&typeof specs[(sequence-1)%specs.length]==="object"?specs[(sequence-1)%specs.length] as Record<string,unknown>:{};return{jobId,batchId:row.id,sequence,contentType:job.type,input:{...baseConfiguration,...spec,sequence}}})})}});
   return db.contentGenerationJob.findUniqueOrThrow({where:{id:jobId}});
 }
 
@@ -26,7 +27,7 @@ export async function processNextContentItem(jobId:string){
   const item=await claimNextItem(jobId);if(!item){await finalizeJob(jobId);return{processed:false,reason:"NO_PENDING_ITEMS"}};
   try{
     const input=item.input&&typeof item.input==="object"&&!Array.isArray(item.input)?item.input as Record<string,unknown>:{};
-    let output:unknown=await generatePipelineContent(job.type,{level:typeof input.level==="string"?input.level:undefined,topic:typeof input.topic==="string"?input.topic:undefined,audience:typeof input.audience==="string"?input.audience:undefined,seed:item.id,sequence:item.sequence},job.createdByUserId??undefined,job.maxTokens??undefined,job.aiModelId??undefined);
+    let output:unknown=await generatePipelineContent(job.type,{level:typeof input.level==="string"?input.level:undefined,topic:typeof input.topic==="string"?input.topic:undefined,audience:typeof input.audience==="string"?input.audience:undefined,seed:item.id,sequence:item.sequence,requirements:input},job.createdByUserId??undefined,job.maxTokens??undefined,job.aiModelId??undefined);
     let inspection=inspectGeneratedContent(job.type,output);let repairAttempted=false;let assessment:AIQualityAssessment|null=null;let aiError:string|null=null;
     if(inspection.errors.length){repairAttempted=true;try{output=await repairGeneratedContent(job.type,output,inspection.errors,job.createdByUserId??undefined,job.aiModelId??undefined);inspection=inspectGeneratedContent(job.type,output)}catch{/* Keep the valid structured draft for manual review. */}}
     try{assessment=await assessContentWithAI(job.type,output,job.createdByUserId??undefined,job.aiModelId??undefined)}catch(error){aiError=error instanceof Error?error.message:"AI_QUALITY_FAILED"}

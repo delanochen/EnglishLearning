@@ -1,6 +1,6 @@
 {
   "name": "ai-family-english",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "engines": {
     "node": ">=20"
@@ -19,7 +19,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "content:run": "tsx scripts/run-content-jobs.ts",
-    "content:worker": "tsx scripts/content-worker.ts"
+    "content:worker": "tsx scripts/content-worker.ts",
+    "content:init": "tsx scripts/init-content-library.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",

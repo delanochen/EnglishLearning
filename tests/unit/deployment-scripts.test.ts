@@ -37,6 +37,13 @@ describe("NAS deployment scripts", () => {
     expect(deploy).toContain("docker inspect --format '{{.State.Health.Status}}'");
   });
 
+  it("plans an empty content library after migrations and before seed data", () => {
+    const entrypoint = readFileSync("scripts/entrypoint.sh", "utf8");
+    expect(entrypoint).toContain("scripts/init-content-library.ts");
+    expect(entrypoint.indexOf("prisma migrate deploy")).toBeLessThan(entrypoint.indexOf("scripts/init-content-library.ts"));
+    expect(entrypoint.indexOf("scripts/init-content-library.ts")).toBeLessThan(entrypoint.indexOf("prisma/seed.ts"));
+  });
+
   it("quotes Prisma configuration table names in the settings snapshot", () => {
     const backup = readFileSync("scripts/backup.sh", "utf8");
     for (const table of ["SystemSetting", "AIProvider", "AIModel", "AIUsageRoute", "AIUsageRouteModel"]) {

@@ -8,6 +8,7 @@ export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD_ENCODED}@
 
 echo "Applying database migrations..."
 ./node_modules/.bin/prisma migrate deploy
+./node_modules/.bin/tsx scripts/init-content-library.ts
 ./node_modules/.bin/tsx prisma/seed.ts
 ./node_modules/.bin/tsx scripts/init-admin.ts
 echo "Starting HomeLingua..."

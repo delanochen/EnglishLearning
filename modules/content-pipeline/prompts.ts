@@ -1,6 +1,6 @@
 import type { ContentGenerationJobType } from "@prisma/client";
 
-export type GenerationContext={level?:string;topic?:string;audience?:string;seed?:string;sequence:number};
+export type GenerationContext={level?:string;topic?:string;audience?:string;seed?:string;sequence:number;requirements?:Record<string,unknown>};
 
 const system:Partial<Record<ContentGenerationJobType,string>>={
   VOCABULARY_GENERATION:"Create one original, copyright-safe English vocabulary lesson. Include natural Chinese support, two original examples, useful collocations, pronunciation text, and unambiguous multiple-choice practice.",
