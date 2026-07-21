@@ -44,6 +44,15 @@ describe("NAS deployment scripts", () => {
     expect(entrypoint.indexOf("scripts/init-content-library.ts")).toBeLessThan(entrypoint.indexOf("prisma/seed.ts"));
   });
 
+  it("recovers the rolled-back content migration before applying its split enum migration", () => {
+    const entrypoint = readFileSync("scripts/entrypoint.sh", "utf8");
+    const enumMigration = readFileSync("prisma/migrations/20260721085900_content_status_enum_values/migration.sql", "utf8");
+    const pipelineMigration = readFileSync("prisma/migrations/20260721090000_content_pipeline_stage1/migration.sql", "utf8");
+    expect(entrypoint).toContain("migrate resolve --rolled-back 20260721090000_content_pipeline_stage1");
+    expect(enumMigration).toContain(`ALTER TYPE "ContentStatus" ADD VALUE 'PENDING'`);
+    expect(pipelineMigration).not.toContain(`ALTER TYPE "ContentStatus" ADD VALUE`);
+  });
+
   it("quotes Prisma configuration table names in the settings snapshot", () => {
     const backup = readFileSync("scripts/backup.sh", "utf8");
     for (const table of ["SystemSetting", "AIProvider", "AIModel", "AIUsageRoute", "AIUsageRouteModel"]) {

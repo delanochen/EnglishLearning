@@ -140,7 +140,7 @@ services:
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB:-homelingua}
       PGUSER: ${POSTGRES_USER:-homelingua}
-      APP_VERSION: ${APP_VERSION:-0.11.0}
+      APP_VERSION: ${APP_VERSION:-0.11.1}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
     secrets: [postgres_password]
     volumes:
