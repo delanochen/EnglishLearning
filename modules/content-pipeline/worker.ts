@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { CONTENT_QUEUE_NAME, contentJobQueue, redisConnection } from "./bullmq";
 import type { ContentQueueMessage } from "./queue";
 import { prepareContentJob, processNextContentItem } from "./processor";
+import { processNextImportItem } from "./importer";
 
 const integer = (value: string | undefined, fallback: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Number.parseInt(value ?? "", 10) || fallback));
@@ -17,8 +18,8 @@ export const workerSettings = () => ({
 async function processQueueJob(job: Job<ContentQueueMessage>) {
   const current = await db.contentGenerationJob.findUnique({ where: { id: job.data.jobId } });
   if (!current || current.status !== "PROCESSING") return { skipped: true, status: current?.status ?? "MISSING" };
-  await prepareContentJob(current.id);
-  const result = await processNextContentItem(current.id);
+  if (current.type !== "PUBLIC_RESOURCE_IMPORT") await prepareContentJob(current.id);
+  const result = current.type === "PUBLIC_RESOURCE_IMPORT" ? await processNextImportItem(current.id) : await processNextContentItem(current.id);
   const refreshed = await db.contentGenerationJob.findUnique({ where: { id: current.id } });
   if (result.processed && refreshed?.status === "PROCESSING") {
     await contentJobQueue().enqueue({ jobId: current.id, priority: current.priority });
@@ -32,7 +33,7 @@ export async function recoverProcessingJobs() {
     data: { status: "PENDING", startedAt: null },
   });
   const jobs = await db.contentGenerationJob.findMany({
-    where: { status: "PROCESSING", type: { in: ["VOCABULARY_GENERATION", "READING_GENERATION", "GRAMMAR_GENERATION", "SCENARIO_GENERATION"] } },
+    where: { status: "PROCESSING", type: { in: ["VOCABULARY_GENERATION", "READING_GENERATION", "GRAMMAR_GENERATION", "SCENARIO_GENERATION", "PUBLIC_RESOURCE_IMPORT"] } },
     select: { id: true, priority: true },
   });
   const queue = contentJobQueue();

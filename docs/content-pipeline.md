@@ -2,7 +2,7 @@
 
 ## 范围与原则
 
-本流水线直接集成到现有 HomeLingua，不建立第二套应用或数据库。阶段 1 交付数据模型、状态机、管理员任务 API 和内容中心基础页面；阶段 2 交付四类结构化 AI 批量生成与数据库队列执行器；阶段 3 接入 Redis、BullMQ 和独立常驻 Worker；阶段 4 接入双重难度、质量安全检查、去重、自动修复和审核工作台。公开资源抓取和自动初始化在后续阶段逐步接入。
+本流水线直接集成到现有 HomeLingua，不建立第二套应用或数据库。阶段 1 交付数据模型、状态机、管理员任务 API 和内容中心基础页面；阶段 2 交付四类结构化 AI 批量生成与数据库队列执行器；阶段 3 接入 Redis、BullMQ 和独立常驻 Worker；阶段 4 接入双重难度、质量安全检查、去重、自动修复和审核工作台；阶段 5 接入合法公开资源导入和许可证管理。自动初始化在后续阶段接入。
 
 所有 AI 或外部内容必须遵循：来源/提示输入 → 原始记录 → 清洗与标准化 → 去重 → 规则与 AI 双重难度评估 → 质量与安全检查 → DRAFT/REVIEW_REQUIRED → 审核 → APPROVED → PUBLISHED。任何失败均保留原因和审计记录，不能绕过审核状态直接发布。
 
@@ -116,6 +116,21 @@ Redis 使用 AOF 并持久化到 `./data/redis`。Worker 使用 `./content-cache
 - 管理员在 `/admin/content-review` 单条或批量批准/拒绝。拒绝必须填写原因；所有决定写入 AuditLog。
 
 阶段 4 API：`GET /api/admin/content/quality`、`GET /api/admin/content/duplicates`、`GET /api/admin/content/review`、`POST /api/admin/content/review/:id/approve|reject`、`POST /api/admin/content/review/bulk`。
+
+## 阶段 5 公开资源导入
+
+管理员在 `/admin/content-import` 先建立许可证，再建立来源白名单，最后按 URL 批量创建导入任务。安全边界：
+
+- 仅允许 HTTPS 443，禁止 URL 用户名/密码、localhost、IP 形式私网目标，以及 DNS 解析到环回、链路本地或 RFC1918/ULA 地址的目标。
+- 当前 URL 和每一次 30x 跳转都重新检查批准域名、路径前缀和 DNS；最多允许三次跳转。
+- 每次抓取前检查通配 User-Agent 的 robots.txt。无法确认、文件过大或明确禁止时默认拒绝。
+- 仅接受 text/plain、text/html、application/json、application/ld+json，响应最多 2MB；HTML 移除 script、style、注释和全部标签。
+- 来源实施每分钟限速；批次最多 100 个 URL，单项失败按任务设置重试。
+- 保存最终来源 URL、作者/机构、许可证及链接、原始发布时间、抓取时间、修改/署名/相同方式共享要求、原始 SHA-256、标准化 SHA-256 和批次 ID。
+- UNKNOWN、RESTRICTED、未允许发布、未批准或未启用的来源不能进入可用草稿；重复内容和许可证风险进入 REVIEW_REQUIRED。
+- Netflix、Disney、YouTube 内容、影视字幕、新闻全文、商业教材、付费/登录内容不能配置为默认来源；系统不提供登录、Cookie、反爬绕过或任意 URL 抓取能力。
+
+阶段 5 API：`GET/POST /api/admin/content/licenses`、`GET/POST /api/admin/content/sources`、`POST /api/admin/content/import`。所有接口均要求系统管理员权限。
 
 ## 对现有模块的影响
 

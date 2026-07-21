@@ -14,7 +14,7 @@ export async function prepareContentJob(jobId:string,batchSize=20){
   return db.contentGenerationJob.findUniqueOrThrow({where:{id:jobId}});
 }
 
-async function claimNextItem(jobId:string){
+export async function claimNextItem(jobId:string){
   for(let attempt=0;attempt<5;attempt++){
     const item=await db.contentGenerationItem.findFirst({where:{jobId,status:"PENDING"},orderBy:{sequence:"asc"}});if(!item)return null;
     const claimed=await db.contentGenerationItem.updateMany({where:{id:item.id,status:"PENDING"},data:{status:"PROCESSING",startedAt:new Date()}});if(claimed.count===1)return{...item,status:"PROCESSING" as const};
