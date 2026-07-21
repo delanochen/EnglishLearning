@@ -8,7 +8,7 @@ import { providerPresets } from "@/modules/ai/provider-presets";
 import { summarizeAIUsage } from "@/modules/ai/usage-stats";
 
 const purposeLabels: Record<AIUsagePurpose, string> = {
-  TUTOR: "AI 英语老师", VOCABULARY: "单词解释", READING: "阅读生成", QUIZ: "出题", GRAMMAR: "语法批改", SCENARIO: "场景课程", WRITING: "写作批改",
+  TUTOR: "AI 英语老师", VOCABULARY: "单词解释", READING: "阅读生成", QUIZ: "出题", GRAMMAR: "语法批改", SCENARIO: "场景课程", CONTENT_REVIEW: "内容质量审核", WRITING: "写作批改",
   LEARNING_PLAN: "学习计划", TRANSLATION: "翻译", SPEECH_RECOGNITION: "语音识别", TTS: "TTS", IMAGE_GENERATION: "图片生成", VIDEO_GENERATION: "视频生成"
 };
 

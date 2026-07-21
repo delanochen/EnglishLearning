@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AIUsagePurpose } from "@prisma/client";
+import type { AIModel, AIProvider, AIUsagePurpose } from "@prisma/client";
 import { db } from "@/lib/db";
 import { decryptSetting, getSettingsEncryptionKey } from "@/lib/settings-crypto";
 import { FixedWindowRateLimiter } from "@/lib/rate-limit";
@@ -8,7 +8,7 @@ import { ProviderHttpError } from "./providers/base";
 import type { ChatInput, ChatResponse, StructuredInput } from "./types";
 import { canFallback, retryDelayMs, shouldRetrySameModel } from "./retry-policy";
 
-type Candidate = Awaited<ReturnType<typeof loadCandidates>>[number];
+type Candidate = { model: AIModel & { provider: AIProvider } };
 const userLimiter = new FixedWindowRateLimiter(30, 60_000);
 
 async function loadCandidates(purpose: AIUsagePurpose, preferredModelId?: string) {
@@ -16,11 +16,11 @@ async function loadCandidates(purpose: AIUsagePurpose, preferredModelId?: string
     where: { purpose },
     include: { models: { where: { enabled: true }, orderBy: { priority: "asc" }, include: { model: { include: { provider: true } } } } }
   });
-  if (!route?.enabled) return [];
-  const candidates = route.models.filter(({ model }) => model.enabled && model.provider.enabled && !model.provider.deletedAt);
-  return preferredModelId
-    ? candidates.toSorted((left, right) => Number(right.model.id === preferredModelId) - Number(left.model.id === preferredModelId))
-    : candidates;
+  const candidates: Candidate[] = route?.enabled ? route.models.filter(({ model }) => model.enabled && model.provider.enabled && !model.provider.deletedAt).map(({ model }) => ({ model })) : [];
+  if (!preferredModelId || candidates.some(({ model }) => model.id === preferredModelId)) return preferredModelId
+    ? candidates.toSorted((left, right) => Number(right.model.id === preferredModelId) - Number(left.model.id === preferredModelId)) : candidates;
+  const preferred = await db.aIModel.findUnique({ where: { id: preferredModelId }, include: { provider: true } });
+  return preferred?.enabled && preferred.provider.enabled && !preferred.provider.deletedAt ? [{ model: preferred }, ...candidates] : candidates;
 }
 
 function classifyError(error: unknown) {

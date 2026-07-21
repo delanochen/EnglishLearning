@@ -2,7 +2,7 @@
 
 ## 范围与原则
 
-本流水线直接集成到现有 HomeLingua，不建立第二套应用或数据库。阶段 1 交付数据模型、状态机、管理员任务 API 和内容中心基础页面；阶段 2 交付四类结构化 AI 批量生成与数据库队列执行器；阶段 3 已接入 Redis、BullMQ 和独立常驻 Worker。公开资源抓取、质量算法和自动初始化在后续阶段逐步接入。
+本流水线直接集成到现有 HomeLingua，不建立第二套应用或数据库。阶段 1 交付数据模型、状态机、管理员任务 API 和内容中心基础页面；阶段 2 交付四类结构化 AI 批量生成与数据库队列执行器；阶段 3 接入 Redis、BullMQ 和独立常驻 Worker；阶段 4 接入双重难度、质量安全检查、去重、自动修复和审核工作台。公开资源抓取和自动初始化在后续阶段逐步接入。
 
 所有 AI 或外部内容必须遵循：来源/提示输入 → 原始记录 → 清洗与标准化 → 去重 → 规则与 AI 双重难度评估 → 质量与安全检查 → DRAFT/REVIEW_REQUIRED → 审核 → APPROVED → PUBLISHED。任何失败均保留原因和审计记录，不能绕过审核状态直接发布。
 
@@ -104,6 +104,18 @@ pnpm content:run
 - `CONTENT_WORKER_LOCK_MS`：BullMQ 活跃锁，默认 120000 毫秒；AI Provider 自身的 timeout 继续限制单次外部请求。
 
 Redis 使用 AOF 并持久化到 `./data/redis`。Worker 使用 `./content-cache`、`./import-cache` 和共享日志目录。容器收到 SIGTERM/SIGINT 后停止领取新任务，等待当前处理结束并关闭 BullMQ、Redis 与数据库连接。启动时会把上次异常退出遗留的 PROCESSING 条目恢复为 PENDING，并重新入队仍处于 PROCESSING 的任务。
+
+## 阶段 4 质量与审核
+
+- 规则检查阻止脚本/HTML 注入、疑似 API Key、个人敏感号码、明显广告和不安全内容。
+- 题目检查答案必须存在于选项、选项不得重复、题干不得直接泄露答案；结构完整性继续由阶段 2 Zod Schema 保证。
+- 阅读保存 Flesch Reading Ease、Flesch-Kincaid Grade、平均句长和词数；词汇、语法和场景使用各自规则估算 CEFR。
+- AI 通过 `CONTENT_REVIEW` 用途独立返回建议等级、信心、质量分和安全/语法/翻译/唯一答案判断。任务明确选择模型时可直接优先使用该模型；自动选择时需在 AI 模型管理中配置“内容质量审核”路由。
+- 规则和 AI 等级相差超过一级、AI 审核不可用、质量分不足或发现相似度不低于 0.85 的候选项时，内容进入 `REVIEW_REQUIRED`。
+- 规则或 AI 检查失败只自动修复一次，修复后重新进行完整检查；仍失败则保留草稿和原因供人工审核。
+- 管理员在 `/admin/content-review` 单条或批量批准/拒绝。拒绝必须填写原因；所有决定写入 AuditLog。
+
+阶段 4 API：`GET /api/admin/content/quality`、`GET /api/admin/content/duplicates`、`GET /api/admin/content/review`、`POST /api/admin/content/review/:id/approve|reject`、`POST /api/admin/content/review/bulk`。
 
 ## 对现有模块的影响
 
