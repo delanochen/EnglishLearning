@@ -1,0 +1,17 @@
+import Link from "next/link";
+import { cookies } from "next/headers";
+import { db } from "@/lib/db";
+import { requireSystemAdmin } from "@/modules/authorization/require-admin";
+import { ContentJobControls, CreateContentJobForm } from "@/components/content-job-controls";
+
+export default async function ContentCenterPage(){
+  await requireSystemAdmin(); const english=(await cookies()).get("ui_locale")?.value==="en";
+  const [jobs,licenses,sources,reviews,quality,duplicates,models]=await Promise.all([
+    db.contentGenerationJob.findMany({take:50,orderBy:[{priority:"asc"},{createdAt:"desc"}],include:{_count:{select:{batches:true,items:true}}}}),
+    db.contentLicense.count(),db.importSource.count(),db.contentReview.count({where:{decision:"PENDING"}}),db.contentQualityReport.count(),db.contentDuplicateMatch.count({where:{status:"PENDING"}}),
+    db.aIModel.findMany({where:{enabled:true},include:{provider:true},orderBy:{priority:"asc"}})
+  ]);
+  const t=english?{title:"Content Center",intro:"Production jobs, sources, licenses, review and quality controls. Stage 1 persists and controls jobs; workers are connected in later stages.",create:"Create generation job",jobs:"Recent jobs",empty:"No jobs yet.",overview:"Pipeline overview",items:"items",progress:"progress",back:"Courses and content"}:{title:"内容中心",intro:"统一管理内容生产任务、来源、许可证、审核与质量。阶段1负责持久化和控制任务，后续阶段接入 Worker。",create:"创建内容生成任务",jobs:"最近任务",empty:"暂无任务。",overview:"流水线概览",items:"条目",progress:"进度",back:"课程与内容"};
+  const cards=[[english?"Jobs":"任务",jobs.length],[english?"Licenses":"许可证",licenses],[english?"Import sources":"导入源",sources],[english?"Pending reviews":"待审核",reviews],[english?"Quality reports":"质量报告",quality],[english?"Duplicate matches":"疑似重复",duplicates]];
+  return <div className="mx-auto max-w-7xl"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-bold uppercase tracking-[.2em] text-brand">Content pipeline</p><h1 className="mt-2 text-4xl font-black">{t.title}</h1><p className="mt-2 max-w-4xl text-muted">{t.intro}</p></div><Link className="button-ghost" href="/admin/content">{t.back}</Link></div><section className="mt-7"><h2 className="text-xl font-black">{t.overview}</h2><div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">{cards.map(([label,value])=><div className="metric" key={String(label)}><span className="text-sm text-muted">{label}</span><strong className="text-3xl">{value}</strong></div>)}</div></section><section className="card mt-6"><h2 className="text-xl font-black">{t.create}</h2><div className="mt-4"><CreateContentJobForm models={models.map(model=>({id:model.id,label:`${model.provider.name} / ${model.displayName}`}))}/></div></section><section className="card mt-6"><h2 className="text-xl font-black">{t.jobs}</h2><div className="mt-4 space-y-3">{jobs.map(job=><article className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700" key={job.id}><div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{job.type}</strong><p className="text-sm text-muted">{job.status} · {job.completedItems}/{job.totalItems} {t.items} · {t.progress} {Math.round(job.currentProgress)}% · {job._count.batches} batches</p><p className="mt-1 font-mono text-xs text-muted">{job.id}</p></div><ContentJobControls job={{id:job.id,status:job.status}}/></div>{job.errorMessage&&<p className="mt-2 text-sm text-red-600">{job.errorMessage}</p>}</article>)}{!jobs.length&&<p className="text-muted">{t.empty}</p>}</div></section></div>;
+}

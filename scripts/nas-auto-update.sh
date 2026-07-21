@@ -110,6 +110,10 @@ if [ "$LOCAL_COMMIT" = "$REMOTE_COMMIT" ]; then
   echo "Running version does not match the current repository; redeploying the current commit."
   /bin/sh "$PROJECT_DIR/scripts/nas-deploy.sh"
   DEPLOYED_COMMIT="$("$GIT_BIN" rev-parse HEAD)"
+  if [ "$DEPLOYED_COMMIT" != "$REMOTE_COMMIT" ]; then
+    echo "Reconciliation ended on unexpected commit: $DEPLOYED_COMMIT" >&2
+    exit 3
+  fi
   if ! verify_running_version; then
     echo "Reconciliation deployment failed: expected=$EXPECTED_VERSION running=${DEPLOYED_VERSION:-unknown}" >&2
     exit 4

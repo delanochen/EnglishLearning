@@ -129,9 +129,70 @@ enum DailyTaskStatus {
 }
 
 enum ContentStatus {
+  PENDING
+  PROCESSING
+  PAUSED
   DRAFT
+  REVIEW_REQUIRED
+  APPROVED
   PUBLISHED
+  REJECTED
+  FAILED
+  CANCELED
   ARCHIVED
+}
+
+enum ContentGenerationJobType {
+  VOCABULARY_GENERATION
+  READING_GENERATION
+  GRAMMAR_GENERATION
+  SCENARIO_GENERATION
+  QUESTION_GENERATION
+  TRANSLATION_GENERATION
+  AUDIO_SCRIPT_GENERATION
+  VIDEO_SCRIPT_GENERATION
+  PUBLIC_RESOURCE_IMPORT
+  CONTENT_RECHECK
+  DUPLICATE_SCAN
+  DIFFICULTY_RECALCULATION
+}
+
+enum ContentSourceType {
+  AI
+  PUBLIC_RESOURCE
+  MANUAL
+}
+
+enum ContentLicenseType {
+  PUBLIC_DOMAIN
+  CC0
+  CC_BY
+  CC_BY_SA
+  GOVERNMENT_OPEN_DATA
+  CUSTOM_ALLOWED
+  UNKNOWN
+  RESTRICTED
+}
+
+enum ContentReviewDecision {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum DuplicateMatchStatus {
+  PENDING
+  CONFIRMED
+  DISMISSED
+  MERGED
+}
+
+enum ContentScheduleFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CRON
 }
 
 enum QuestionType {
@@ -282,43 +343,43 @@ model FamilyMember {
 }
 
 model LearnerProfile {
-  id                 String                   @id @default(uuid()) @db.Uuid
-  familyMemberId     String                   @unique @db.Uuid
-  ageBand            AgeBand
-  cefrLevel          CefrLevel?
-  goals              String[]
-  dailyMinutes       Int                      @default(20)
-  dailyVocabularyGoal Int                     @default(10)
-  interests          String[]
-  weakAreas          String[]
-  totalXp            Int                      @default(0)
-  supportLanguage    String                   @default("zh-CN")
-  onboardingStatus   OnboardingStatus         @default(PLACEMENT_PENDING)
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  familyMember       FamilyMember             @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
-  conversations      AIConversation[]
-  vocabularyProgress UserVocabularyProgress[]
-  readingProgress    ReadingProgress[]
+  id                      String                   @id @default(uuid()) @db.Uuid
+  familyMemberId          String                   @unique @db.Uuid
+  ageBand                 AgeBand
+  cefrLevel               CefrLevel?
+  goals                   String[]
+  dailyMinutes            Int                      @default(20)
+  dailyVocabularyGoal     Int                      @default(10)
+  interests               String[]
+  weakAreas               String[]
+  totalXp                 Int                      @default(0)
+  supportLanguage         String                   @default("zh-CN")
+  onboardingStatus        OnboardingStatus         @default(PLACEMENT_PENDING)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  familyMember            FamilyMember             @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+  conversations           AIConversation[]
+  vocabularyProgress      UserVocabularyProgress[]
+  readingProgress         ReadingProgress[]
   dailyReadingAssignments DailyReadingAssignment[]
-  dailyTasks         DailyTask[]
-  quizSessions       QuizSession[]
-  activities         LearningActivity[]
-  grammarProgress    GrammarProgress[]
-  listeningProgress  ListeningProgress[]
-  speakingSessions   SpeakingSession[]
-  writingSubmissions WritingSubmission[]
-  learningPlans      LearningPlan[]
-  weeklyReports      WeeklyReport[]
-  monthlyReports     MonthlyReport[]
-  scenarioProgress   ScenarioProgress[]
-  placementTests     PlacementTest[]
-  studyStreak        StudyStreak?
-  achievements       UserAchievement[]
-  notifications      Notification[]
-  uploadedFiles      UploadedFile[]
-  mistakes           MistakeRecord[]
-  vocabularyGames    VocabularyGameSession[]
+  dailyTasks              DailyTask[]
+  quizSessions            QuizSession[]
+  activities              LearningActivity[]
+  grammarProgress         GrammarProgress[]
+  listeningProgress       ListeningProgress[]
+  speakingSessions        SpeakingSession[]
+  writingSubmissions      WritingSubmission[]
+  learningPlans           LearningPlan[]
+  weeklyReports           WeeklyReport[]
+  monthlyReports          MonthlyReport[]
+  scenarioProgress        ScenarioProgress[]
+  placementTests          PlacementTest[]
+  studyStreak             StudyStreak?
+  achievements            UserAchievement[]
+  notifications           Notification[]
+  uploadedFiles           UploadedFile[]
+  mistakes                MistakeRecord[]
+  vocabularyGames         VocabularyGameSession[]
 }
 
 model MistakeRecord {
@@ -571,27 +632,40 @@ model AIMessage {
 }
 
 model Vocabulary {
-  id            String                   @id @default(uuid()) @db.Uuid
-  word          String
-  phonetic      String?
-  partOfSpeech  String?
-  definitionEn  String
-  level         CefrLevel
-  topic         String
-  audioUrl      String?
-  imageUrl      String?
-  sourceName    String?
-  sourceUrl     String?
-  sourceLicense String?
-  status        ContentStatus            @default(PUBLISHED)
-  createdAt     DateTime                 @default(now())
-  updatedAt     DateTime                 @updatedAt
-  meanings      VocabularyMeaning[]
-  examples      VocabularyExample[]
-  progress      UserVocabularyProgress[]
-  relationsFrom VocabularyRelation[]     @relation("VocabularyRelationSource")
-  relationsTo   VocabularyRelation[]     @relation("VocabularyRelationTarget")
-  gameAnswers   VocabularyGameAnswer[]
+  id                  String                   @id @default(uuid()) @db.Uuid
+  word                String
+  phonetic            String?
+  partOfSpeech        String?
+  definitionEn        String
+  level               CefrLevel
+  topic               String
+  audioUrl            String?
+  imageUrl            String?
+  sourceName          String?
+  sourceUrl           String?
+  sourceLicense       String?
+  status              ContentStatus            @default(PUBLISHED)
+  sourceType          ContentSourceType        @default(MANUAL)
+  sourceId            String?                  @db.Uuid
+  licenseId           String?                  @db.Uuid
+  generationJobId     String?                  @db.Uuid
+  qualityScore        Float?
+  reviewStatus        ContentReviewDecision    @default(PENDING)
+  publishedAt         DateTime?
+  archivedAt          DateTime?
+  originalHash        String?
+  normalizedHash      String?
+  aiGenerated         Boolean                  @default(false)
+  requiresAttribution Boolean                  @default(false)
+  attributionText     String?                  @db.Text
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  meanings            VocabularyMeaning[]
+  examples            VocabularyExample[]
+  progress            UserVocabularyProgress[]
+  relationsFrom       VocabularyRelation[]     @relation("VocabularyRelationSource")
+  relationsTo         VocabularyRelation[]     @relation("VocabularyRelationTarget")
+  gameAnswers         VocabularyGameAnswer[]
 
   @@unique([word, partOfSpeech])
   @@index([level, topic, status])
@@ -704,26 +778,38 @@ model VocabularyGameAnswer {
 }
 
 model ReadingArticle {
-  id               String            @id @default(uuid()) @db.Uuid
-  title            String
-  body             String            @db.Text
-  translation      String?           @db.Text
-  level            CefrLevel
-  audience         String
-  wordCount        Int
-  topic            String
-  targetVocabulary String[]
-  targetGrammar    String[]
-  summary          String            @default("") @db.Text
-  oralRetellingPrompt String         @default("") @db.Text
-  writingExtensionPrompt String      @default("") @db.Text
-  status           ContentStatus     @default(PUBLISHED)
-  aiGenerated      Boolean           @default(false)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  questions        ReadingQuestion[]
-  progress         ReadingProgress[]
-  dailyAssignments DailyReadingAssignment[]
+  id                     String                   @id @default(uuid()) @db.Uuid
+  title                  String
+  body                   String                   @db.Text
+  translation            String?                  @db.Text
+  level                  CefrLevel
+  audience               String
+  wordCount              Int
+  topic                  String
+  targetVocabulary       String[]
+  targetGrammar          String[]
+  summary                String                   @default("") @db.Text
+  oralRetellingPrompt    String                   @default("") @db.Text
+  writingExtensionPrompt String                   @default("") @db.Text
+  status                 ContentStatus            @default(PUBLISHED)
+  aiGenerated            Boolean                  @default(false)
+  sourceType             ContentSourceType        @default(MANUAL)
+  sourceId               String?                  @db.Uuid
+  licenseId              String?                  @db.Uuid
+  generationJobId        String?                  @db.Uuid
+  qualityScore           Float?
+  reviewStatus           ContentReviewDecision    @default(PENDING)
+  publishedAt            DateTime?
+  archivedAt             DateTime?
+  originalHash           String?
+  normalizedHash         String?
+  requiresAttribution    Boolean                  @default(false)
+  attributionText        String?                  @db.Text
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  questions              ReadingQuestion[]
+  progress               ReadingProgress[]
+  dailyAssignments       DailyReadingAssignment[]
 
   @@index([level, topic, status])
 }
@@ -839,29 +925,29 @@ model QuizQuestion {
 }
 
 model LearningPlan {
-  id               String             @id @default(uuid()) @db.Uuid
-  learnerProfileId String             @db.Uuid
-  type             LearningPlanType
-  periodStart      DateTime           @db.Date
-  periodEnd        DateTime           @db.Date
-  status           PlanStatus         @default(ACTIVE)
-  goals            String[]
-  focusAreas       String[]             @default([])
-  recommendedCourses String[]           @default([])
-  reviewContent    String[]             @default([])
-  stageGoals       String[]             @default([])
-  monthlyEvaluation String?             @db.Text
-  adjustmentSuggestions String[]        @default([])
-  generationSource String
-  adjustmentReason String?
-  version          Int                @default(1)
-  supersedesId     String?            @db.Uuid
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  learnerProfile   LearnerProfile     @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
-  supersedes       LearningPlan?      @relation("PlanVersions", fields: [supersedesId], references: [id])
-  revisions        LearningPlan[]     @relation("PlanVersions")
-  items            LearningPlanItem[]
+  id                    String             @id @default(uuid()) @db.Uuid
+  learnerProfileId      String             @db.Uuid
+  type                  LearningPlanType
+  periodStart           DateTime           @db.Date
+  periodEnd             DateTime           @db.Date
+  status                PlanStatus         @default(ACTIVE)
+  goals                 String[]
+  focusAreas            String[]           @default([])
+  recommendedCourses    String[]           @default([])
+  reviewContent         String[]           @default([])
+  stageGoals            String[]           @default([])
+  monthlyEvaluation     String?            @db.Text
+  adjustmentSuggestions String[]           @default([])
+  generationSource      String
+  adjustmentReason      String?
+  version               Int                @default(1)
+  supersedesId          String?            @db.Uuid
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  learnerProfile        LearnerProfile     @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  supersedes            LearningPlan?      @relation("PlanVersions", fields: [supersedesId], references: [id])
+  revisions             LearningPlan[]     @relation("PlanVersions")
+  items                 LearningPlanItem[]
 
   @@unique([learnerProfileId, type, periodStart, version])
   @@index([learnerProfileId, status, periodStart])
@@ -920,25 +1006,38 @@ model MonthlyReport {
 }
 
 model ScenarioLesson {
-  id                 String             @id @default(uuid()) @db.Uuid
-  category           String
-  title              String
-  intro              String             @db.Text
-  level              CefrLevel
-  cultureTips        String[]
-  misunderstandings  String[]
-  naturalExpressions String[]
-  sourceType         ScenarioSourceType @default(ORIGINAL)
-  sourceNote         String?
-  status             ContentStatus      @default(PUBLISHED)
-  version            Int                @default(1)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  dialogues          ScenarioDialogue[]
-  exercises          ScenarioExercise[]
-  videoLesson        VideoLesson?
-  progress           ScenarioProgress[]
-  vocabulary         ScenarioVocabulary[]
+  id                  String                @id @default(uuid()) @db.Uuid
+  category            String
+  title               String
+  intro               String                @db.Text
+  level               CefrLevel
+  cultureTips         String[]
+  misunderstandings   String[]
+  naturalExpressions  String[]
+  sourceType          ScenarioSourceType    @default(ORIGINAL)
+  sourceNote          String?
+  status              ContentStatus         @default(PUBLISHED)
+  contentSourceType   ContentSourceType     @default(MANUAL)
+  sourceId            String?               @db.Uuid
+  licenseId           String?               @db.Uuid
+  generationJobId     String?               @db.Uuid
+  qualityScore        Float?
+  reviewStatus        ContentReviewDecision @default(PENDING)
+  publishedAt         DateTime?
+  archivedAt          DateTime?
+  originalHash        String?
+  normalizedHash      String?
+  aiGenerated         Boolean               @default(false)
+  requiresAttribution Boolean               @default(false)
+  attributionText     String?               @db.Text
+  version             Int                   @default(1)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  dialogues           ScenarioDialogue[]
+  exercises           ScenarioExercise[]
+  videoLesson         VideoLesson?
+  progress            ScenarioProgress[]
+  vocabulary          ScenarioVocabulary[]
 
   @@unique([category, title, version])
   @@index([category, level, status])
@@ -1073,21 +1172,21 @@ model StudyStreakEvent {
 }
 
 model Achievement {
-  id          String            @id @default(uuid()) @db.Uuid
-  code        String            @unique
-  name        String
-  nameEn      String?
-  description String
+  id            String            @id @default(uuid()) @db.Uuid
+  code          String            @unique
+  name          String
+  nameEn        String?
+  description   String
   descriptionEn String?
-  icon        String
-  category    String            @default("GENERAL")
-  metric      String
-  threshold   Int
-  rewardXp    Int               @default(0)
-  active      Boolean           @default(true)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  users       UserAchievement[]
+  icon          String
+  category      String            @default("GENERAL")
+  metric        String
+  threshold     Int
+  rewardXp      Int               @default(0)
+  active        Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  users         UserAchievement[]
 }
 
 model UserAchievement {
@@ -1103,21 +1202,34 @@ model UserAchievement {
 }
 
 model GrammarTopic {
-  id        String            @id @default(uuid()) @db.Uuid
-  slug      String            @unique
-  title     String
-  ruleEn    String            @db.Text
-  ruleZh    String            @db.Text
-  commonErrors String[]          @default([])
-  useCases     String[]          @default([])
-  contrastExamples Json?
-  level     CefrLevel
-  status    ContentStatus     @default(PUBLISHED)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  examples  GrammarExample[]
-  exercises GrammarExercise[]
-  progress  GrammarProgress[]
+  id                  String                @id @default(uuid()) @db.Uuid
+  slug                String                @unique
+  title               String
+  ruleEn              String                @db.Text
+  ruleZh              String                @db.Text
+  commonErrors        String[]              @default([])
+  useCases            String[]              @default([])
+  contrastExamples    Json?
+  level               CefrLevel
+  status              ContentStatus         @default(PUBLISHED)
+  sourceType          ContentSourceType     @default(MANUAL)
+  sourceId            String?               @db.Uuid
+  licenseId           String?               @db.Uuid
+  generationJobId     String?               @db.Uuid
+  qualityScore        Float?
+  reviewStatus        ContentReviewDecision @default(PENDING)
+  publishedAt         DateTime?
+  archivedAt          DateTime?
+  originalHash        String?
+  normalizedHash      String?
+  aiGenerated         Boolean               @default(false)
+  requiresAttribution Boolean               @default(false)
+  attributionText     String?               @db.Text
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  examples            GrammarExample[]
+  exercises           GrammarExercise[]
+  progress            GrammarProgress[]
 
   @@index([level, status])
 }
@@ -1177,18 +1289,31 @@ model GrammarAttempt {
 }
 
 model ListeningExercise {
-  id          String              @id @default(uuid()) @db.Uuid
-  title       String
-  level       CefrLevel
-  transcript  String              @db.Text
-  translation String?             @db.Text
-  audioUrl    String?
-  topic       String
-  status      ContentStatus       @default(PUBLISHED)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  questions   ListeningQuestion[]
-  progress    ListeningProgress[]
+  id                  String                @id @default(uuid()) @db.Uuid
+  title               String
+  level               CefrLevel
+  transcript          String                @db.Text
+  translation         String?               @db.Text
+  audioUrl            String?
+  topic               String
+  status              ContentStatus         @default(PUBLISHED)
+  sourceType          ContentSourceType     @default(MANUAL)
+  sourceId            String?               @db.Uuid
+  licenseId           String?               @db.Uuid
+  generationJobId     String?               @db.Uuid
+  qualityScore        Float?
+  reviewStatus        ContentReviewDecision @default(PENDING)
+  publishedAt         DateTime?
+  archivedAt          DateTime?
+  originalHash        String?
+  normalizedHash      String?
+  aiGenerated         Boolean               @default(false)
+  requiresAttribution Boolean               @default(false)
+  attributionText     String?               @db.Text
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  questions           ListeningQuestion[]
+  progress            ListeningProgress[]
 
   @@index([level, status])
 }
@@ -1272,16 +1397,29 @@ model PronunciationFeedback {
 }
 
 model WritingAssignment {
-  id          String              @id @default(uuid()) @db.Uuid
-  title       String
-  type        String
-  prompt      String              @db.Text
-  level       CefrLevel
-  targetWords Int
-  status      ContentStatus       @default(PUBLISHED)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  submissions WritingSubmission[]
+  id                  String                @id @default(uuid()) @db.Uuid
+  title               String
+  type                String
+  prompt              String                @db.Text
+  level               CefrLevel
+  targetWords         Int
+  status              ContentStatus         @default(PUBLISHED)
+  sourceType          ContentSourceType     @default(MANUAL)
+  sourceId            String?               @db.Uuid
+  licenseId           String?               @db.Uuid
+  generationJobId     String?               @db.Uuid
+  qualityScore        Float?
+  reviewStatus        ContentReviewDecision @default(PENDING)
+  publishedAt         DateTime?
+  archivedAt          DateTime?
+  originalHash        String?
+  normalizedHash      String?
+  aiGenerated         Boolean               @default(false)
+  requiresAttribution Boolean               @default(false)
+  attributionText     String?               @db.Text
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  submissions         WritingSubmission[]
 
   @@index([level, status])
 }
@@ -1397,4 +1535,374 @@ model Notification {
 
   @@index([userId, readAt, createdAt])
   @@index([learnerProfileId, readAt, createdAt])
+}
+
+model ContentLicense {
+  id                  String               @id @default(uuid()) @db.Uuid
+  type                ContentLicenseType
+  name                String
+  url                 String?
+  allowsModification  Boolean              @default(false)
+  allowsCommercialUse Boolean              @default(false)
+  requiresAttribution Boolean              @default(false)
+  requiresShareAlike  Boolean              @default(false)
+  publicationAllowed  Boolean              @default(false)
+  notes               String?              @db.Text
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  sources             ContentSource[]
+  importSources       ImportSource[]
+  rawContents         ImportedRawContent[]
+  attributions        ContentAttribution[]
+
+  @@index([type, publicationAllowed])
+}
+
+model ContentSource {
+  id                  String            @id @default(uuid()) @db.Uuid
+  type                ContentSourceType
+  name                String
+  url                 String?
+  author              String?
+  licenseId           String?           @db.Uuid
+  originalPublishedAt DateTime?
+  retrievedAt         DateTime?
+  allowsModification  Boolean           @default(false)
+  requiresAttribution Boolean           @default(false)
+  requiresShareAlike  Boolean           @default(false)
+  originalHash        String?
+  metadata            Json?
+  approved            Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  license             ContentLicense?   @relation(fields: [licenseId], references: [id], onDelete: Restrict)
+
+  @@index([type, approved])
+  @@index([originalHash])
+}
+
+model ImportSource {
+  id                  String         @id @default(uuid()) @db.Uuid
+  name                String
+  baseUrl             String
+  allowedDomains      String[]
+  allowedPathPrefixes String[]       @default([])
+  licenseId           String         @db.Uuid
+  enabled             Boolean        @default(false)
+  approved            Boolean        @default(false)
+  robotsCheckedAt     DateTime?
+  robotsAllowed       Boolean?
+  rateLimitPerMinute  Int            @default(10)
+  configuration       Json?
+  createdByUserId     String?        @db.Uuid
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  license             ContentLicense @relation(fields: [licenseId], references: [id], onDelete: Restrict)
+  batches             ImportBatch[]
+
+  @@index([enabled, approved])
+}
+
+model ImportBatch {
+  id              String                @id @default(uuid()) @db.Uuid
+  importSourceId  String                @db.Uuid
+  generationJobId String?               @db.Uuid
+  status          ContentStatus         @default(PENDING)
+  totalItems      Int                   @default(0)
+  processedItems  Int                   @default(0)
+  failedItems     Int                   @default(0)
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  errorMessage    String?               @db.Text
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  importSource    ImportSource          @relation(fields: [importSourceId], references: [id], onDelete: Restrict)
+  generationJob   ContentGenerationJob? @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
+  rawContents     ImportedRawContent[]
+
+  @@index([importSourceId, status, createdAt])
+  @@index([generationJobId])
+}
+
+model ImportedRawContent {
+  id                  String         @id @default(uuid()) @db.Uuid
+  importBatchId       String         @db.Uuid
+  sourceUrl           String
+  author              String?
+  licenseId           String         @db.Uuid
+  originalPublishedAt DateTime?
+  retrievedAt         DateTime       @default(now())
+  rawContent          String         @db.Text
+  cleanedContent      String?        @db.Text
+  originalHash        String
+  normalizedHash      String?
+  status              ContentStatus  @default(PENDING)
+  errorMessage        String?        @db.Text
+  metadata            Json?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  importBatch         ImportBatch    @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  license             ContentLicense @relation(fields: [licenseId], references: [id], onDelete: Restrict)
+
+  @@unique([importBatchId, originalHash])
+  @@index([status, createdAt])
+  @@index([normalizedHash])
+}
+
+model ContentGenerationJob {
+  id              String                   @id @default(uuid()) @db.Uuid
+  type            ContentGenerationJobType
+  status          ContentStatus            @default(PENDING)
+  totalItems      Int                      @default(0)
+  completedItems  Int                      @default(0)
+  failedItems     Int                      @default(0)
+  currentProgress Float                    @default(0)
+  priority        Int                      @default(100)
+  createdByUserId String?                  @db.Uuid
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  errorMessage    String?                  @db.Text
+  retryCount      Int                      @default(0)
+  maxRetries      Int                      @default(1)
+  aiProviderId    String?                  @db.Uuid
+  aiModelId       String?                  @db.Uuid
+  inputTokens     Int                      @default(0)
+  outputTokens    Int                      @default(0)
+  estimatedCost   Decimal                  @default(0) @db.Decimal(14, 6)
+  maxTokens       Int?
+  maxBudget       Decimal?                 @db.Decimal(14, 6)
+  configuration   Json?
+  logs            Json                     @default("[]")
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  batches         ContentGenerationBatch[]
+  items           ContentGenerationItem[]
+  importBatches   ImportBatch[]
+  reviews         ContentReview[]
+  qualityReports  ContentQualityReport[]
+
+  @@index([status, priority, createdAt])
+  @@index([type, status, createdAt])
+  @@index([createdByUserId, createdAt])
+}
+
+model ContentGenerationBatch {
+  id             String                  @id @default(uuid()) @db.Uuid
+  jobId          String                  @db.Uuid
+  sequence       Int
+  status         ContentStatus           @default(PENDING)
+  totalItems     Int                     @default(0)
+  completedItems Int                     @default(0)
+  failedItems    Int                     @default(0)
+  checkpoint     Json?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  errorMessage   String?                 @db.Text
+  retryCount     Int                     @default(0)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  job            ContentGenerationJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  items          ContentGenerationItem[]
+
+  @@unique([jobId, sequence])
+  @@index([status, createdAt])
+}
+
+model ContentGenerationItem {
+  id             String                  @id @default(uuid()) @db.Uuid
+  jobId          String                  @db.Uuid
+  batchId        String?                 @db.Uuid
+  sequence       Int
+  contentType    String
+  contentId      String?                 @db.Uuid
+  status         ContentStatus           @default(PENDING)
+  input          Json?
+  output         Json?
+  originalHash   String?
+  normalizedHash String?
+  errorCode      String?
+  errorMessage   String?                 @db.Text
+  retryCount     Int                     @default(0)
+  inputTokens    Int                     @default(0)
+  outputTokens   Int                     @default(0)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  job            ContentGenerationJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  batch          ContentGenerationBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@unique([jobId, sequence])
+  @@index([batchId, status])
+  @@index([contentType, contentId])
+  @@index([normalizedHash])
+}
+
+model ContentReview {
+  id              String                @id @default(uuid()) @db.Uuid
+  generationJobId String?               @db.Uuid
+  contentType     String
+  contentId       String                @db.Uuid
+  decision        ContentReviewDecision @default(PENDING)
+  reviewerUserId  String?               @db.Uuid
+  reason          String?               @db.Text
+  notes           String?               @db.Text
+  reviewedAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  generationJob   ContentGenerationJob? @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
+
+  @@index([decision, createdAt])
+  @@index([contentType, contentId])
+}
+
+model ContentQualityReport {
+  id               String                @id @default(uuid()) @db.Uuid
+  generationJobId  String?               @db.Uuid
+  contentType      String
+  contentId        String?               @db.Uuid
+  generationItemId String?               @db.Uuid
+  passed           Boolean               @default(false)
+  qualityScore     Float
+  ruleBasedLevel   CefrLevel?
+  aiSuggestedLevel CefrLevel?
+  finalLevel       CefrLevel?
+  confidence       Float?
+  reviewReason     String?               @db.Text
+  checks           Json
+  errors           Json                  @default("[]")
+  warnings         Json                  @default("[]")
+  repairAttempted  Boolean               @default(false)
+  createdAt        DateTime              @default(now())
+  generationJob    ContentGenerationJob? @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
+
+  @@index([passed, qualityScore, createdAt])
+  @@index([contentType, contentId])
+}
+
+model ContentDuplicateMatch {
+  id                   String               @id @default(uuid()) @db.Uuid
+  sourceContentType    String
+  sourceContentId      String?              @db.Uuid
+  candidateContentType String
+  candidateContentId   String?              @db.Uuid
+  method               String
+  score                Float
+  details              Json?
+  status               DuplicateMatchStatus @default(PENDING)
+  reviewedByUserId     String?              @db.Uuid
+  reviewedAt           DateTime?
+  createdAt            DateTime             @default(now())
+
+  @@index([status, score, createdAt])
+  @@index([sourceContentType, sourceContentId])
+}
+
+model ContentSchedule {
+  id              String                   @id @default(uuid()) @db.Uuid
+  name            String
+  enabled         Boolean                  @default(false)
+  jobType         ContentGenerationJobType
+  frequency       ContentScheduleFrequency
+  cronExpression  String?
+  timezone        String                   @default("America/Chicago")
+  quantity        Int
+  levels          CefrLevel[]
+  topics          String[]
+  aiProviderId    String?                  @db.Uuid
+  aiModelId       String?                  @db.Uuid
+  maxTokens       Int?
+  maxBudget       Decimal?                 @db.Decimal(14, 6)
+  maxRetries      Int                      @default(1)
+  autoPublish     Boolean                  @default(false)
+  nextRunAt       DateTime?
+  lastRunAt       DateTime?
+  createdByUserId String?                  @db.Uuid
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@index([enabled, nextRunAt])
+}
+
+model ContentUsageStat {
+  id             String                    @id @default(uuid()) @db.Uuid
+  usageDate      DateTime                  @db.Date
+  providerId     String?                   @db.Uuid
+  modelId        String?                   @db.Uuid
+  jobType        ContentGenerationJobType?
+  requestCount   Int                       @default(0)
+  successCount   Int                       @default(0)
+  failureCount   Int                       @default(0)
+  inputTokens    Int                       @default(0)
+  outputTokens   Int                       @default(0)
+  estimatedCost  Decimal                   @default(0) @db.Decimal(14, 6)
+  totalLatencyMs BigInt                    @default(0)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@unique([usageDate, providerId, modelId, jobType])
+  @@index([usageDate])
+}
+
+model ContentTag {
+  id          String                 @id @default(uuid()) @db.Uuid
+  slug        String                 @unique
+  name        String
+  nameEn      String?
+  createdAt   DateTime               @default(now())
+  assignments ContentTagAssignment[]
+}
+
+model ContentTagAssignment {
+  id          String     @id @default(uuid()) @db.Uuid
+  tagId       String     @db.Uuid
+  contentType String
+  contentId   String     @db.Uuid
+  createdAt   DateTime   @default(now())
+  tag         ContentTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, contentType, contentId])
+  @@index([contentType, contentId])
+}
+
+model ContentTopic {
+  id          String                   @id @default(uuid()) @db.Uuid
+  slug        String                   @unique
+  name        String
+  nameEn      String?
+  parentId    String?                  @db.Uuid
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  parent      ContentTopic?            @relation("ContentTopicTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    ContentTopic[]           @relation("ContentTopicTree")
+  assignments ContentTopicAssignment[]
+}
+
+model ContentTopicAssignment {
+  id          String       @id @default(uuid()) @db.Uuid
+  topicId     String       @db.Uuid
+  contentType String
+  contentId   String       @db.Uuid
+  createdAt   DateTime     @default(now())
+  topic       ContentTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, contentType, contentId])
+  @@index([contentType, contentId])
+}
+
+model ContentAttribution {
+  id                 String         @id @default(uuid()) @db.Uuid
+  contentType        String
+  contentId          String         @db.Uuid
+  licenseId          String         @db.Uuid
+  sourceName         String
+  sourceUrl          String?
+  author             String?
+  attributionText    String         @db.Text
+  shareAlikeRequired Boolean        @default(false)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  license            ContentLicense @relation(fields: [licenseId], references: [id], onDelete: Restrict)
+
+  @@index([contentType, contentId])
 }
