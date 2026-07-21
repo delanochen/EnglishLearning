@@ -2,7 +2,7 @@
 
 ## 范围与原则
 
-本流水线直接集成到现有 HomeLingua，不建立第二套应用或数据库。阶段 1 只交付数据模型、状态机、管理员任务 API 和内容中心基础页面。AI 批量生成、Redis/BullMQ Worker、公开资源抓取、质量算法和自动初始化在后续阶段逐步接入。
+本流水线直接集成到现有 HomeLingua，不建立第二套应用或数据库。阶段 1 交付数据模型、状态机、管理员任务 API 和内容中心基础页面；阶段 2 已交付四类结构化 AI 批量生成与数据库队列执行器。Redis/BullMQ Worker、公开资源抓取、质量算法和自动初始化在后续阶段逐步接入。
 
 所有 AI 或外部内容必须遵循：来源/提示输入 → 原始记录 → 清洗与标准化 → 去重 → 规则与 AI 双重难度评估 → 质量与安全检查 → DRAFT/REVIEW_REQUIRED → 审核 → APPROVED → PUBLISHED。任何失败均保留原因和审计记录，不能绕过审核状态直接发布。
 
@@ -64,7 +64,7 @@
 6. 首次启动检测、分批初始化、断点续传和库存补充。
 7. 数据库驱动的定时任务、Token/预算限制、统计与告警。
 
-## 阶段 1 文件
+## 阶段 1–2 文件
 
 - `prisma/schema.prisma` 与对应 migration
 - `modules/content-pipeline/schemas.ts`
@@ -76,6 +76,23 @@
 - `components/content-job-controls.tsx`
 - `tests/unit/content-pipeline-*.test.ts`
 - `docs/content-pipeline.md`、`README.md`
+- `modules/content-pipeline/generation-schemas.ts`
+- `modules/content-pipeline/prompts.ts`
+- `modules/content-pipeline/generator.ts`
+- `modules/content-pipeline/batching.ts`
+- `modules/content-pipeline/processor.ts`
+- `modules/content-pipeline/persistence.ts`
+- `scripts/run-content-jobs.ts`
+
+## 阶段 2 运行方式
+
+启动生成任务只负责状态转换和建立可恢复的批次，不在 HTTP 请求内调用 AI。数据库队列消费者运行：
+
+```bash
+pnpm content:run
+```
+
+默认每次最多处理 20 条，可用 `CONTENT_RUN_MAX_ITEMS` 设置 1–200。NAS 在阶段 3 常驻 Worker 上线前，可通过任务计划每 5–10 分钟运行 `docker compose exec -T app /app/scripts/run-content-jobs.sh`。该包装脚本会从 Docker secret 安全构造数据库连接；暂停任务会立即停止领取新条目，已完成条目不会重复生成，失败条目按照任务 `maxRetries` 重试。
 
 ## 对现有模块的影响
 

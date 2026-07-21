@@ -11,13 +11,16 @@ import { canFallback, retryDelayMs, shouldRetrySameModel } from "./retry-policy"
 type Candidate = Awaited<ReturnType<typeof loadCandidates>>[number];
 const userLimiter = new FixedWindowRateLimiter(30, 60_000);
 
-async function loadCandidates(purpose: AIUsagePurpose) {
+async function loadCandidates(purpose: AIUsagePurpose, preferredModelId?: string) {
   const route = await db.aIUsageRoute.findUnique({
     where: { purpose },
     include: { models: { where: { enabled: true }, orderBy: { priority: "asc" }, include: { model: { include: { provider: true } } } } }
   });
   if (!route?.enabled) return [];
-  return route.models.filter(({ model }) => model.enabled && model.provider.enabled && !model.provider.deletedAt);
+  const candidates = route.models.filter(({ model }) => model.enabled && model.provider.enabled && !model.provider.deletedAt);
+  return preferredModelId
+    ? candidates.toSorted((left, right) => Number(right.model.id === preferredModelId) - Number(left.model.id === preferredModelId))
+    : candidates;
 }
 
 function classifyError(error: unknown) {
@@ -39,9 +42,9 @@ async function instantiate(candidate: Candidate) {
   return createProvider(provider.type, provider.baseUrl, apiKey, provider.timeoutMs);
 }
 
-export async function routedChat(purpose: AIUsagePurpose, input: Omit<ChatInput, "model">, userId?: string): Promise<ChatResponse> {
+export async function routedChat(purpose: AIUsagePurpose, input: Omit<ChatInput, "model">, userId?: string, preferredModelId?: string): Promise<ChatResponse> {
   if (userId && !userLimiter.check(`${userId}:${purpose}`).allowed) throw new Error("AI_USER_RATE_LIMIT");
-  const candidates = await loadCandidates(purpose);
+  const candidates = await loadCandidates(purpose, preferredModelId);
   if (!candidates.length) throw new Error(`AI_ROUTE_NOT_CONFIGURED:${purpose}`);
   const requestId = randomUUID(); let fallbackFromId: string | undefined; let attemptNo = 0;
   for (let index = 0; index < candidates.length; index++) {
@@ -70,14 +73,14 @@ export async function routedChat(purpose: AIUsagePurpose, input: Omit<ChatInput,
   throw new Error("AI_ALL_PROVIDERS_FAILED");
 }
 
-export async function routedStructured<T>(purpose: AIUsagePurpose, input: Omit<StructuredInput<T>, "model">, userId?: string) {
+export async function routedStructured<T>(purpose: AIUsagePurpose, input: Omit<StructuredInput<T>, "model">, userId?: string, preferredModelId?: string) {
   const contract=input.schemaInstructions??input.schemaName;
-  const first = await routedChat(purpose, { ...input, messages: [...input.messages, { role: "system", content: `Return one JSON object only. Do not use Markdown or wrap it in another property. Follow this exact contract:\n${contract}` }] }, userId);
+  const first = await routedChat(purpose, { ...input, messages: [...input.messages, { role: "system", content: `Return one JSON object only. Do not use Markdown or wrap it in another property. Follow this exact contract:\n${contract}` }] }, userId, preferredModelId);
   try { return input.schema.parse(JSON.parse(first.text)); }
   catch (error) {
     await db.auditLog.create({ data: { actorUserId: userId, action: "AI_STRUCTURED_VALIDATION_RETRY", resourceType: "AISchema", resourceId: input.schemaName, metadata: { error: error instanceof Error ? error.name : "VALIDATION_ERROR" } } });
     const issue=error instanceof Error?error.message:"VALIDATION_ERROR";
-    const retry = await routedChat(purpose, { ...input, messages: [...input.messages, { role: "system", content: `Your previous JSON failed validation: ${issue.slice(0,2000)}. Return one corrected JSON object only, with the exact keys and enum casing in this contract:\n${contract}` }] }, userId);
+    const retry = await routedChat(purpose, { ...input, messages: [...input.messages, { role: "system", content: `Your previous JSON failed validation: ${issue.slice(0,2000)}. Return one corrected JSON object only, with the exact keys and enum casing in this contract:\n${contract}` }] }, userId, preferredModelId);
     try { return input.schema.parse(JSON.parse(retry.text)); }
     catch (retryError) { await db.auditLog.create({ data: { actorUserId: userId, action: "AI_STRUCTURED_VALIDATION_FAILED", resourceType: "AISchema", resourceId: input.schemaName, metadata: { error: retryError instanceof Error ? retryError.name : "VALIDATION_ERROR" } } }); throw retryError; }
   }
