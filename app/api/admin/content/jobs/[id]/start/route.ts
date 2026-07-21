@@ -5,13 +5,17 @@ import { contentApiError } from "@/modules/content-pipeline/api";
 import { transitionContentJob } from "@/modules/content-pipeline/jobs";
 import { isSupportedGenerationType } from "@/modules/content-pipeline/generator";
 import { prepareContentJob } from "@/modules/content-pipeline/processor";
+import { contentJobQueue } from "@/modules/content-pipeline/bullmq";
 
 export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const actor = await requireSystemAdmin();
   try {
     const id = z.string().uuid().parse((await params).id);
     const job = await transitionContentJob(id, "PROCESSING", actor.id, "CONTENT_JOB_STARTED");
-    if (isSupportedGenerationType(job.type)) await prepareContentJob(id);
+    if (isSupportedGenerationType(job.type)) {
+      await prepareContentJob(id);
+      await contentJobQueue().enqueue({ jobId: id, priority: job.priority });
+    }
     return NextResponse.json({ job });
   } catch (error) {
     return contentApiError(error);

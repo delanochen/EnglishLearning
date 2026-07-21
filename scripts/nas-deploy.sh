@@ -14,9 +14,9 @@ for file in postgres_password auth_secret settings_encryption_key initial_admin_
 done
 chmod 700 secrets
 chmod 644 secrets/*
-mkdir -p data/postgres uploads logs backups backups/restore-staging
-chown -R 1001:1001 uploads logs backups
-chmod -R u+rwX,g+rwX uploads logs backups
+mkdir -p data/postgres data/redis uploads logs backups backups/restore-staging content-cache import-cache
+chown -R 1001:1001 uploads logs backups content-cache import-cache
+chmod -R u+rwX,g+rwX uploads logs backups content-cache import-cache
 "$GIT_BIN" config --global --add safe.directory "$PROJECT_DIR" >/dev/null 2>&1 || true
 "$GIT_BIN" pull --ff-only origin main
 docker compose config >/dev/null
@@ -31,6 +31,16 @@ until curl -fsS "http://127.0.0.1:${APP_PORT}/api/health/ready" >/dev/null 2>&1;
   attempt=$((attempt + 1))
   if [ "$attempt" -ge 40 ]; then echo "Health check timed out." >&2; docker compose ps -a; docker compose logs --tail=300 app postgres; exit 1; fi
   sleep 3
+done
+for service in redis content-worker; do
+  attempt=0
+  container_id="$(docker compose ps -q "$service")"
+  [ -n "$container_id" ] || { echo "$service container was not created." >&2; docker compose ps -a; exit 1; }
+  until [ "$(docker inspect --format '{{.State.Health.Status}}' "$container_id" 2>/dev/null || true)" = "healthy" ]; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 40 ]; then echo "$service health check timed out." >&2; docker compose ps -a; docker compose logs --tail=300 "$service"; exit 1; fi
+    sleep 3
+  done
 done
 docker compose ps
 echo "HomeLingua is ready on port ${APP_PORT}."

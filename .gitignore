@@ -8,6 +8,8 @@ test-results
 .env
 .env.local
 data/
+content-cache/
+import-cache/
 uploads/*
 !uploads/.gitkeep
 logs/*

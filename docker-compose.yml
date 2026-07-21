@@ -22,12 +22,28 @@ services:
       options: { max-size: "10m", max-file: "3" }
     networks: [internal]
 
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging: *logging
+    networks: [internal]
+
   app:
     build: .
     image: homelingua-app
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -37,6 +53,8 @@ services:
       AUTH_TRUST_HOST: "true"
       UPLOAD_DIR: /app/uploads
       LOG_DIR: /app/logs
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     secrets: [postgres_password, auth_secret, settings_encryption_key, initial_admin_email, initial_admin_password]
     volumes:
       - ./uploads:/app/uploads
@@ -50,6 +68,40 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
+    logging: *logging
+    networks: [internal]
+
+  content-worker:
+    image: homelingua-app
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-homelingua}
+      POSTGRES_USER: ${POSTGRES_USER:-homelingua}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CONTENT_WORKER_CONCURRENCY: ${CONTENT_WORKER_CONCURRENCY:-2}
+      CONTENT_WORKER_RATE_MAX: ${CONTENT_WORKER_RATE_MAX:-20}
+      CONTENT_WORKER_RATE_DURATION_MS: ${CONTENT_WORKER_RATE_DURATION_MS:-60000}
+      CONTENT_WORKER_LOCK_MS: ${CONTENT_WORKER_LOCK_MS:-120000}
+      LOG_DIR: /app/logs
+    secrets: [postgres_password, settings_encryption_key]
+    volumes:
+      - ./logs:/app/logs
+      - ./content-cache:/app/content-cache
+      - ./import-cache:/app/import-cache
+    entrypoint: ["/app/scripts/content-worker-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 3m
     logging: *logging
     networks: [internal]
 
@@ -88,7 +140,7 @@ services:
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB:-homelingua}
       PGUSER: ${POSTGRES_USER:-homelingua}
-      APP_VERSION: ${APP_VERSION:-0.7.0}
+      APP_VERSION: ${APP_VERSION:-0.8.0}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
     secrets: [postgres_password]
     volumes:

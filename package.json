@@ -1,6 +1,6 @@
 {
   "name": "ai-family-english",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "engines": {
     "node": ">=20"
@@ -18,12 +18,14 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "content:run": "tsx scripts/run-content-jobs.ts"
+    "content:run": "tsx scripts/run-content-jobs.ts",
+    "content:worker": "tsx scripts/content-worker.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
     "@prisma/client": "^6.2.1",
     "argon2": "^0.41.1",
+    "bullmq": "^5.80.9",
     "clsx": "^2.1.1",
     "lucide-react": "^0.468.0",
     "next": "^15.1.3",

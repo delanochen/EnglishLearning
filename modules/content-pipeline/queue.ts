@@ -2,10 +2,11 @@ export type ContentQueueMessage = { jobId: string; priority: number };
 
 export interface ContentJobQueue {
   enqueue(message: ContentQueueMessage): Promise<void>;
+  close?(): Promise<void>;
 }
 
-// Stage 1 deliberately uses PostgreSQL as the queue. A worker claims PENDING rows
-// with SELECT ... FOR UPDATE SKIP LOCKED. BullMQ can implement this interface later.
+// PostgreSQL remains the durable source of truth and the safe fallback when Redis
+// is intentionally disabled for local development.
 export class DatabaseContentJobQueue implements ContentJobQueue {
   async enqueue() { /* The persisted PENDING job is the queue message. */ }
 }

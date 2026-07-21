@@ -26,6 +26,17 @@ describe("NAS deployment scripts", () => {
     expect(deploy).toContain("chown -R 1001:1001 uploads logs backups");
   });
 
+  it("creates persistent Redis and content worker directories", () => {
+    expect(deploy).toContain("data/redis");
+    expect(deploy).toContain("content-cache import-cache");
+    const compose = readFileSync("docker-compose.yml", "utf8");
+    expect(compose).toContain("content-worker:");
+    expect(compose).toContain("redis:");
+    expect(compose).not.toContain("6379:6379");
+    expect(deploy).toContain("for service in redis content-worker");
+    expect(deploy).toContain("docker inspect --format '{{.State.Health.Status}}'");
+  });
+
   it("quotes Prisma configuration table names in the settings snapshot", () => {
     const backup = readFileSync("scripts/backup.sh", "utf8");
     for (const table of ["SystemSetting", "AIProvider", "AIModel", "AIUsageRoute", "AIUsageRouteModel"]) {

@@ -9,6 +9,7 @@ const actions: Record<string, Array<[string, string]>> = {
   PROCESSING: [["pause", "暂停"], ["cancel", "取消"]],
   PAUSED: [["resume", "恢复"], ["cancel", "取消"]],
   FAILED: [["retry", "重试"]],
+  REVIEW_REQUIRED: [["retry", "重试失败项"]],
 };
 
 export function ContentJobControls({ job }: { job: Job }) {

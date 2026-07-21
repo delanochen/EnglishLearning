@@ -59,3 +59,28 @@ export async function transitionContentJob(id: string, to: PipelineStatus, actor
     return tx.contentGenerationJob.findUniqueOrThrow({ where: { id } });
   });
 }
+
+export async function retryFailedContentJob(id: string, actorUserId: string) {
+  return db.$transaction(async (tx) => {
+    const current = await tx.contentGenerationJob.findUnique({ where: { id } });
+    if (!current) throw new Error("CONTENT_JOB_NOT_FOUND");
+    if (!(["FAILED", "REVIEW_REQUIRED"] as ContentStatus[]).includes(current.status)) throw new Error(`INVALID_JOB_RETRY:${current.status}`);
+    const failedItems = await tx.contentGenerationItem.findMany({ where: { jobId: id, status: "FAILED" }, select: { batchId: true } });
+    const failed = failedItems.length;
+    if (!failed) throw new Error("CONTENT_JOB_HAS_NO_FAILED_ITEMS");
+    const now = new Date();
+    const logs = Array.isArray(current.logs) ? current.logs : [];
+    await tx.contentGenerationItem.updateMany({ where: { jobId: id, status: "FAILED" }, data: { status: "PENDING", errorCode: null, errorMessage: null, finishedAt: null } });
+    const failedBatchIds = [...new Set(failedItems.flatMap((item) => item.batchId ? [item.batchId] : []))];
+    for (const batchId of failedBatchIds) {
+      await tx.contentGenerationBatch.update({ where: { id: batchId }, data: { status: "PROCESSING", failedItems: 0, finishedAt: null } });
+    }
+    const job = await tx.contentGenerationJob.update({ where: { id }, data: {
+      status: "PROCESSING", failedItems: 0, finishedAt: null, errorMessage: null, retryCount: { increment: 1 },
+      currentProgress: current.totalItems ? (current.completedItems / current.totalItems) * 100 : 0,
+      logs: [...logs, { at: now.toISOString(), event: "CONTENT_JOB_FAILED_ITEMS_RETRIED", count: failed }] as Prisma.InputJsonValue,
+    } });
+    await tx.auditLog.create({ data: { actorUserId, action: "CONTENT_JOB_FAILED_ITEMS_RETRIED", resourceType: "ContentGenerationJob", resourceId: id, metadata: { count: failed } } });
+    return job;
+  });
+}

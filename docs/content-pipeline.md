@@ -2,7 +2,7 @@
 
 ## 范围与原则
 
-本流水线直接集成到现有 HomeLingua，不建立第二套应用或数据库。阶段 1 交付数据模型、状态机、管理员任务 API 和内容中心基础页面；阶段 2 已交付四类结构化 AI 批量生成与数据库队列执行器。Redis/BullMQ Worker、公开资源抓取、质量算法和自动初始化在后续阶段逐步接入。
+本流水线直接集成到现有 HomeLingua，不建立第二套应用或数据库。阶段 1 交付数据模型、状态机、管理员任务 API 和内容中心基础页面；阶段 2 交付四类结构化 AI 批量生成与数据库队列执行器；阶段 3 已接入 Redis、BullMQ 和独立常驻 Worker。公开资源抓取、质量算法和自动初始化在后续阶段逐步接入。
 
 所有 AI 或外部内容必须遵循：来源/提示输入 → 原始记录 → 清洗与标准化 → 去重 → 规则与 AI 双重难度评估 → 质量与安全检查 → DRAFT/REVIEW_REQUIRED → 审核 → APPROVED → PUBLISHED。任何失败均保留原因和审计记录，不能绕过审核状态直接发布。
 
@@ -93,6 +93,17 @@ pnpm content:run
 ```
 
 默认每次最多处理 20 条，可用 `CONTENT_RUN_MAX_ITEMS` 设置 1–200。NAS 在阶段 3 常驻 Worker 上线前，可通过任务计划每 5–10 分钟运行 `docker compose exec -T app /app/scripts/run-content-jobs.sh`。该包装脚本会从 Docker secret 安全构造数据库连接；暂停任务会立即停止领取新条目，已完成条目不会重复生成，失败条目按照任务 `maxRetries` 重试。
+
+## 阶段 3 Worker
+
+`docker compose up -d` 会同时启动 `redis` 和不可从浏览器访问的 `content-worker`。配置项：
+
+- `CONTENT_WORKER_CONCURRENCY`：并发任务数，默认 2，范围 1–20。
+- `CONTENT_WORKER_RATE_MAX`：速率窗口内最多处理的内容条目，默认 20。
+- `CONTENT_WORKER_RATE_DURATION_MS`：速率窗口，默认 60000 毫秒。
+- `CONTENT_WORKER_LOCK_MS`：BullMQ 活跃锁，默认 120000 毫秒；AI Provider 自身的 timeout 继续限制单次外部请求。
+
+Redis 使用 AOF 并持久化到 `./data/redis`。Worker 使用 `./content-cache`、`./import-cache` 和共享日志目录。容器收到 SIGTERM/SIGINT 后停止领取新任务，等待当前处理结束并关闭 BullMQ、Redis 与数据库连接。启动时会把上次异常退出遗留的 PROCESSING 条目恢复为 PENDING，并重新入队仍处于 PROCESSING 的任务。
 
 ## 对现有模块的影响
 
