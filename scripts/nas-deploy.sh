@@ -9,6 +9,15 @@ GIT_BIN="${GIT_BIN:-$(command -v git 2>/dev/null || true)}"
 PROJECT_DIR="${PROJECT_DIR:-/volume2/docker/EnglishLearning}"
 APP_PORT="${APP_PORT:-3000}"
 cd "$PROJECT_DIR"
+mkdir -p logs
+DEPLOY_LOCK_DIR="$PROJECT_DIR/logs/.auto-update.lock"
+if [ "${DEPLOY_LOCK_HELD:-0}" != "1" ]; then
+  if ! mkdir "$DEPLOY_LOCK_DIR" 2>/dev/null; then
+    echo "Another deployment is already running; try again after it finishes." >&2
+    exit 75
+  fi
+  trap 'rmdir "$DEPLOY_LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
+fi
 for file in postgres_password auth_secret settings_encryption_key initial_admin_email initial_admin_password; do
   if [ ! -s "secrets/$file" ]; then echo "Missing or empty secret: $PROJECT_DIR/secrets/$file" >&2; exit 2; fi
 done
@@ -20,8 +29,12 @@ mkdir -p data/postgres data/redis uploads logs backups backups/restore-staging c
 # Compose starts Redis or AOF initialization will fail with Permission denied.
 chown -R 999:1000 data/redis
 chmod -R u+rwX,g+rwX data/redis
-chown -R 1001:1001 uploads logs backups content-cache import-cache
-chmod -R u+rwX,g+rwX uploads logs backups content-cache import-cache
+chown -R 1001:1001 uploads logs content-cache import-cache
+chmod -R u+rwX,g+rwX uploads logs content-cache import-cache
+# Backup jobs atomically rename *.partial directories. Only adjust the stable
+# mount points here so a concurrent rename cannot make recursive chmod fail.
+chown 1001:1001 backups backups/restore-staging
+chmod u+rwX,g+rwX backups backups/restore-staging
 "$GIT_BIN" config --global --add safe.directory "$PROJECT_DIR" >/dev/null 2>&1 || true
 "$GIT_BIN" pull --ff-only origin main
 docker compose config >/dev/null

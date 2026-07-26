@@ -108,7 +108,7 @@ if [ "$LOCAL_COMMIT" = "$REMOTE_COMMIT" ]; then
   fi
 
   echo "Running version does not match the current repository; redeploying the current commit."
-  /bin/sh "$PROJECT_DIR/scripts/nas-deploy.sh"
+  DEPLOY_LOCK_HELD=1 /bin/sh "$PROJECT_DIR/scripts/nas-deploy.sh"
   DEPLOYED_COMMIT="$("$GIT_BIN" rev-parse HEAD)"
   if [ "$DEPLOYED_COMMIT" != "$REMOTE_COMMIT" ]; then
     echo "Reconciliation ended on unexpected commit: $DEPLOYED_COMMIT" >&2
@@ -125,7 +125,7 @@ fi
 
 echo "Deploying $LOCAL_COMMIT -> $REMOTE_COMMIT"
 "$GIT_BIN" pull --ff-only origin main
-/bin/sh "$PROJECT_DIR/scripts/nas-deploy.sh"
+DEPLOY_LOCK_HELD=1 /bin/sh "$PROJECT_DIR/scripts/nas-deploy.sh"
 DEPLOYED_COMMIT="$("$GIT_BIN" rev-parse HEAD)"
 
 if [ "$DEPLOYED_COMMIT" != "$REMOTE_COMMIT" ]; then
