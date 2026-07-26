@@ -15,6 +15,11 @@ done
 chmod 700 secrets
 chmod 644 secrets/*
 mkdir -p data/postgres data/redis uploads logs backups backups/restore-staging content-cache import-cache
+# The official redis:7.4-alpine image runs Redis as uid 999 / gid 1000.
+# Synology creates bind-mount directories as root, so repair ownership before
+# Compose starts Redis or AOF initialization will fail with Permission denied.
+chown -R 999:1000 data/redis
+chmod -R u+rwX,g+rwX data/redis
 chown -R 1001:1001 uploads logs backups content-cache import-cache
 chmod -R u+rwX,g+rwX uploads logs backups content-cache import-cache
 "$GIT_BIN" config --global --add safe.directory "$PROJECT_DIR" >/dev/null 2>&1 || true
@@ -25,7 +30,12 @@ if docker compose ps -q postgres 2>/dev/null | grep -q .; then
   docker compose --profile operations run --rm backup
 fi
 docker compose build --pull app
-docker compose up -d
+if ! docker compose up -d; then
+  echo "Docker Compose failed to start the services." >&2
+  docker compose ps -a
+  docker compose logs --tail=300 redis app content-worker postgres
+  exit 1
+fi
 attempt=0
 until curl -fsS "http://127.0.0.1:${APP_PORT}/api/health/ready" >/dev/null 2>&1; do
   attempt=$((attempt + 1))
