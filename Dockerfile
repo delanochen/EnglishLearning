@@ -25,6 +25,7 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/modules ./modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 RUN mkdir -p /app/uploads /app/logs /backups && chown -R nextjs:nodejs /app/uploads /app/logs /backups && chmod +x /app/scripts/*.sh
 USER nextjs
 EXPOSE 3000

@@ -43,6 +43,10 @@ if docker compose ps -q postgres 2>/dev/null | grep -q .; then
   docker compose --profile operations run --rm backup
 fi
 docker compose build --pull app
+# Remove app/worker containers explicitly before recreation. Interrupted
+# Synology deployments can leave Docker's temporary rename containers behind,
+# which otherwise cause "container name is already in use" conflicts.
+docker compose rm -sf app content-worker >/dev/null 2>&1 || true
 if ! docker compose up -d; then
   echo "Docker Compose failed to start the services." >&2
   docker compose ps -a
