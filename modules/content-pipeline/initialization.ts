@@ -52,6 +52,47 @@ export async function startInitializationJobs(actorUserId: string) {
   return jobs.length;
 }
 
+export async function retryInitializationFailures(actorUserId: string, repairVersion: string) {
+  const jobs = await db.contentGenerationJob.findMany({
+    where: { failedItems: { gt: 0 }, configuration: { path: ["initialization"], equals: true } },
+    orderBy: { createdAt: "asc" },
+  });
+  let restarted = 0;
+  for (const job of jobs) {
+    const configuration = job.configuration && typeof job.configuration === "object" && !Array.isArray(job.configuration)
+      ? job.configuration as Prisma.JsonObject
+      : {};
+    if (configuration.repairVersion === repairVersion) continue;
+    const failed = await db.contentGenerationItem.count({ where: { jobId: job.id, status: "FAILED" } });
+    if (!failed) continue;
+    await db.$transaction(async tx => {
+      await tx.contentGenerationItem.updateMany({
+        where: { jobId: job.id, status: "FAILED" },
+        data: { status: "PENDING", errorCode: null, errorMessage: null, finishedAt: null, retryCount: 0 },
+      });
+      await tx.contentGenerationBatch.updateMany({
+        where: { jobId: job.id, failedItems: { gt: 0 } },
+        data: { status: "PROCESSING", failedItems: 0, finishedAt: null },
+      });
+      await tx.contentGenerationJob.update({
+        where: { id: job.id },
+        data: {
+          status: "PROCESSING",
+          failedItems: 0,
+          finishedAt: null,
+          errorMessage: null,
+          createdByUserId: job.createdByUserId ?? actorUserId,
+          configuration: { ...configuration, repairVersion },
+          logs: [...(Array.isArray(job.logs) ? job.logs as Prisma.JsonArray : []), { at: new Date().toISOString(), event: "INITIALIZATION_FAILURES_REQUEUED", failed, repairVersion }],
+        },
+      });
+    });
+    await contentJobQueue().enqueue({ jobId: job.id, priority: job.priority });
+    restarted++;
+  }
+  return restarted;
+}
+
 export async function initializationStatus() {
   const jobs = await db.contentGenerationJob.findMany({ where: { configuration: { path: ["initialization"], equals: true } }, orderBy: { createdAt: "asc" } });
   const total=jobs.reduce((sum,job)=>sum+job.totalItems,0),completed=jobs.reduce((sum,job)=>sum+job.completedItems,0),failed=jobs.reduce((sum,job)=>sum+job.failedItems,0);

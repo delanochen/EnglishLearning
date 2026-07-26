@@ -1,5 +1,5 @@
 import { db } from "../lib/db";
-import { ensureInitializationPlan, startInitializationJobs } from "../modules/content-pipeline/initialization";
+import { ensureInitializationPlan, retryInitializationFailures, startInitializationJobs } from "../modules/content-pipeline/initialization";
 
 async function main() {
   const administrator = await db.user.findFirst({
@@ -9,7 +9,8 @@ async function main() {
   if (!administrator) throw new Error("CONTENT_INITIALIZATION_ADMIN_REQUIRED");
   const result = await ensureInitializationPlan({ actorUserId: administrator.id });
   const started = await startInitializationJobs(administrator.id);
-  console.log(`Content initialization plan: ${result.created} job(s) created; ${started} pending job(s) started.`);
+  const restarted = await retryInitializationFailures(administrator.id, "0.12.1");
+  console.log(`Content initialization plan: ${result.created} job(s) created; ${started} pending job(s) started; ${restarted} failed job(s) repaired.`);
 }
 
 main()

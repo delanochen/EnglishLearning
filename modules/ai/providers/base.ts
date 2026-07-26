@@ -27,7 +27,11 @@ export abstract class BaseProvider implements AIProvider {
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
       const response = await fetch(url, { ...init, signal: init.signal ?? controller.signal });
-      if (!response.ok) throw new ProviderHttpError(response.status, `Provider request failed (${response.status})`);
+      if (!response.ok) {
+        const raw = await response.text().catch(() => "");
+        const detail = raw.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 1200);
+        throw new ProviderHttpError(response.status, `Provider request failed (${response.status})${detail ? `: ${detail}` : ""}`);
+      }
       return response;
     } finally { clearTimeout(timeout); }
   }
