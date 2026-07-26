@@ -2,7 +2,9 @@
 
 ## 一键升级与验收
 
-仓库已提供 `scripts/nas-deploy.sh`。它会检查 secrets、对正在运行的版本先做备份、拉取 main、构建启动，并等待 ready 健康检查；失败时会直接打印容器状态和最近日志。
+仓库已提供 `scripts/nas-deploy.sh`。GitHub Actions 会在测试通过后构建应用镜像并发布到 GitHub Container Registry（GHCR）。NAS 脚本会检查 secrets、拉取 main、按当前 Git 提交号拉取完全匹配的预构建镜像、对正在运行的版本做备份、启动服务，并等待 ready 健康检查。NAS 不再本地安装 pnpm 依赖或编译 Next.js。
+
+首次使用前，需要在 GitHub 仓库的 **Packages → englishlearning → Package settings → Change visibility** 中把容器包设置为 **Public**。镜像不包含 NAS secrets；密码和 API Key 仍只通过 NAS 的 `secrets/` 文件挂载。若保持 Private，则需要先在 NAS 使用具有 `read:packages` 权限的 GitHub PAT 执行 `docker login ghcr.io`。
 
 ```bash
 cd /volume2/docker/EnglishLearning
@@ -14,7 +16,7 @@ chmod +x scripts/nas-deploy.sh
 
 ## GitHub 推送后自动更新
 
-仓库提供 `scripts/nas-auto-update.sh`。它只在 `origin/main` 出现新提交时调用完整部署流程，并使用目录锁避免两个部署同时运行。若 NAS 上的受版本控制文件存在本地修改，脚本会停止，避免覆盖修改。
+仓库提供 `scripts/nas-auto-update.sh`。它只在 `origin/main` 出现新提交时调用完整部署流程，并使用目录锁避免两个部署同时运行。若对应提交的 GHCR 镜像仍在 GitHub Actions 中构建，部署会在停止旧容器之前退出并保留当前健康版本，下一次计划任务会自动重试。若 NAS 上的受版本控制文件存在本地修改，脚本会停止，避免覆盖修改。
 
 在群晖打开“控制面板 → 任务计划 → 新增 → 计划的任务 → 用户定义的脚本”：
 

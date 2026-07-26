@@ -38,8 +38,7 @@ services:
     networks: [internal]
 
   app:
-    build: .
-    image: homelingua-app
+    image: ${HOMELINGUA_IMAGE:-ghcr.io/delanochen/englishlearning}:${HOMELINGUA_IMAGE_TAG:-main}
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
@@ -72,7 +71,7 @@ services:
     networks: [internal]
 
   content-worker:
-    image: homelingua-app
+    image: ${HOMELINGUA_IMAGE:-ghcr.io/delanochen/englishlearning}:${HOMELINGUA_IMAGE_TAG:-main}
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
@@ -106,7 +105,7 @@ services:
     networks: [internal]
 
   reports:
-    image: homelingua-app
+    image: ${HOMELINGUA_IMAGE:-ghcr.io/delanochen/englishlearning}:${HOMELINGUA_IMAGE_TAG:-main}
     profiles: [operations]
     depends_on:
       postgres: { condition: service_healthy }
@@ -140,7 +139,7 @@ services:
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB:-homelingua}
       PGUSER: ${POSTGRES_USER:-homelingua}
-      APP_VERSION: ${APP_VERSION:-0.11.6}
+      APP_VERSION: ${APP_VERSION:-0.12.0}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
     secrets: [postgres_password]
     volumes:

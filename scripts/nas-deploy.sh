@@ -37,12 +37,19 @@ chown 1001:1001 backups backups/restore-staging
 chmod u+rwX,g+rwX backups backups/restore-staging
 "$GIT_BIN" config --global --add safe.directory "$PROJECT_DIR" >/dev/null 2>&1 || true
 "$GIT_BIN" pull --ff-only origin main
+HOMELINGUA_IMAGE_TAG="$("$GIT_BIN" rev-parse HEAD)"
+export HOMELINGUA_IMAGE_TAG
+echo "Deploying prebuilt image: ${HOMELINGUA_IMAGE:-ghcr.io/delanochen/englishlearning}:${HOMELINGUA_IMAGE_TAG}"
 docker compose config >/dev/null
+if ! docker compose pull app content-worker; then
+  echo "The prebuilt GitHub image is not available yet. The current healthy deployment was left unchanged." >&2
+  echo "Check the GitHub Actions 'Publish NAS image' job and GHCR package visibility." >&2
+  exit 69
+fi
 if docker compose ps -q postgres 2>/dev/null | grep -q .; then
   echo "Creating pre-upgrade backup..."
   docker compose --profile operations run --rm backup
 fi
-docker compose build --pull app
 # Remove app/worker containers explicitly before recreation. Interrupted
 # Synology deployments can leave Docker's temporary rename containers behind,
 # which otherwise cause "container name is already in use" conflicts.

@@ -38,6 +38,19 @@ describe("NAS deployment scripts", () => {
     expect(deploy).toContain("docker inspect --format '{{.State.Health.Status}}'");
   });
 
+  it("pulls an immutable GitHub image instead of building Next.js on the NAS", () => {
+    const compose = readFileSync("docker-compose.yml", "utf8");
+    const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+    expect(compose).toContain("ghcr.io/delanochen/englishlearning");
+    expect(compose).toContain("HOMELINGUA_IMAGE_TAG");
+    expect(deploy).toContain('HOMELINGUA_IMAGE_TAG="$("$GIT_BIN" rev-parse HEAD)"');
+    expect(deploy).toContain("docker compose pull app content-worker");
+    expect(deploy).not.toContain("docker compose build");
+    expect(workflow).toContain("docker/build-push-action@v6");
+    expect(workflow).toContain("ghcr.io/delanochen/englishlearning:${{ github.sha }}");
+    expect(workflow).toContain("needs: verify");
+  });
+
   it("initializes missing content after roles and the administrator are ready", () => {
     const entrypoint = readFileSync("scripts/entrypoint.sh", "utf8");
     expect(entrypoint).toContain("scripts/init-content-library.ts");
