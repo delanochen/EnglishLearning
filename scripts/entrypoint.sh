@@ -12,8 +12,8 @@ echo "Applying database migrations..."
 # migration back, but Prisma retains the failed attempt until it is resolved.
 ./node_modules/.bin/prisma migrate resolve --rolled-back 20260721090000_content_pipeline_stage1 >/dev/null 2>&1 || true
 ./node_modules/.bin/prisma migrate deploy
-./node_modules/.bin/tsx scripts/init-content-library.ts
 ./node_modules/.bin/tsx prisma/seed.ts
 ./node_modules/.bin/tsx scripts/init-admin.ts
+./node_modules/.bin/tsx scripts/init-content-library.ts
 echo "Starting HomeLingua..."
 exec ./node_modules/.bin/next start

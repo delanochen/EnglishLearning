@@ -23,7 +23,8 @@ describe("NAS deployment scripts", () => {
   });
 
   it("makes application bind mounts writable by the non-root container user",()=>{
-    expect(deploy).toContain("chown -R 1001:1001 uploads logs backups");
+    expect(deploy).toContain("chown -R 1001:1001 uploads logs content-cache import-cache");
+    expect(deploy).toContain("chown 1001:1001 backups backups/restore-staging");
   });
 
   it("creates persistent Redis and content worker directories", () => {
@@ -37,11 +38,14 @@ describe("NAS deployment scripts", () => {
     expect(deploy).toContain("docker inspect --format '{{.State.Health.Status}}'");
   });
 
-  it("plans an empty content library after migrations and before seed data", () => {
+  it("initializes missing content after roles and the administrator are ready", () => {
     const entrypoint = readFileSync("scripts/entrypoint.sh", "utf8");
     expect(entrypoint).toContain("scripts/init-content-library.ts");
     expect(entrypoint.indexOf("prisma migrate deploy")).toBeLessThan(entrypoint.indexOf("scripts/init-content-library.ts"));
-    expect(entrypoint.indexOf("scripts/init-content-library.ts")).toBeLessThan(entrypoint.indexOf("prisma/seed.ts"));
+    expect(entrypoint.indexOf("prisma/seed.ts")).toBeLessThan(entrypoint.indexOf("scripts/init-content-library.ts"));
+    expect(entrypoint.indexOf("scripts/init-admin.ts")).toBeLessThan(entrypoint.indexOf("scripts/init-content-library.ts"));
+    const initializer = readFileSync("scripts/init-content-library.ts", "utf8");
+    expect(initializer).toContain("startInitializationJobs");
   });
 
   it("recovers the rolled-back content migration before applying its split enum migration", () => {

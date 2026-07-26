@@ -44,7 +44,11 @@ export async function ensureInitializationPlan(options: { onlyWhenEmpty?: boolea
 
 export async function startInitializationJobs(actorUserId: string) {
   const jobs = await db.contentGenerationJob.findMany({ where: { status: "PENDING", configuration: { path: ["initialization"], equals: true } }, orderBy: { createdAt: "asc" } });
-  for (const current of jobs) { const job=await transitionContentJob(current.id,"PROCESSING",actorUserId,"INITIALIZATION_JOB_STARTED");await contentJobQueue().enqueue({jobId:job.id,priority:job.priority}); }
+  for (const current of jobs) {
+    await db.contentGenerationJob.updateMany({ where: { id: current.id, createdByUserId: null }, data: { createdByUserId: actorUserId } });
+    const job=await transitionContentJob(current.id,"PROCESSING",actorUserId,"INITIALIZATION_JOB_STARTED");
+    await contentJobQueue().enqueue({jobId:job.id,priority:job.priority});
+  }
   return jobs.length;
 }
 
