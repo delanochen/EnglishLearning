@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { grammarCourseSchema, readingArticleSchema, scenarioCourseSchema, vocabularyCourseSchema } from "@/modules/ai/content-schemas";
 
-const practiceQuestion=z.object({prompt:z.string().min(3),options:z.array(z.string().min(1)).min(2),answerKey:z.string().min(1),explanation:z.string().min(1)}).superRefine((value,ctx)=>{if(!value.options.includes(value.answerKey))ctx.addIssue({code:"custom",message:"answerKey must exactly match one option",path:["answerKey"]})});
+const practiceQuestion=z.preprocess(value=>{
+  if(!value||typeof value!=="object"||Array.isArray(value))return value;
+  const row=value as Record<string,unknown>,options=Array.isArray(row.options)?row.options:[];
+  const raw=typeof row.answerKey==="string"?row.answerKey.trim():row.answerKey;
+  const index=typeof raw==="string"&&/^[A-Za-z]$/.test(raw)?raw.toUpperCase().charCodeAt(0)-65:typeof raw==="string"&&/^\d+$/.test(raw)?Number(raw)-1:-1;
+  return{...row,answerKey:index>=0&&index<options.length?options[index]:raw};
+},z.object({prompt:z.string().min(3),options:z.array(z.string().min(1)).min(2),answerKey:z.string().min(1),explanation:z.string().min(1)}).superRefine((value,ctx)=>{if(!value.options.includes(value.answerKey))ctx.addIssue({code:"custom",message:"answerKey must exactly match one option",path:["answerKey"]})}));
 
 export const pipelineVocabularySchema=vocabularyCourseSchema.extend({
   examples:z.array(z.object({sentence:z.string().min(5),translation:z.string().min(2)})).min(2),

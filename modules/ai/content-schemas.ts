@@ -6,9 +6,18 @@ const questionTypes=["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "VOCABULAR
 function record(value:unknown):Record<string,unknown>{return value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{}}
 function first(source:Record<string,unknown>,...keys:string[]){for(const key of keys)if(source[key]!==undefined)return source[key]}
 function normalizeQuestionType(value:unknown){return typeof value==="string"?value.trim().toUpperCase().replaceAll("-","_").replaceAll(" ","_"):value}
+function normalizeAnswerKey(value:unknown,options:unknown){
+  if(typeof value!=="string"||!Array.isArray(options))return value;
+  const exact=options.find(option=>option===value);if(exact!==undefined)return exact;
+  const normalized=value.trim();
+  const letterIndex=/^[A-Za-z]$/.test(normalized)?normalized.toUpperCase().charCodeAt(0)-65:-1;
+  if(letterIndex>=0&&letterIndex<options.length)return options[letterIndex];
+  const numberIndex=/^\d+$/.test(normalized)?Number(normalized)-1:-1;
+  return numberIndex>=0&&numberIndex<options.length?options[numberIndex]:value;
+}
 const readingQuestionObject=z.object({ type: z.enum(questionTypes), prompt: z.string().min(1), options: z.array(z.string()).optional(), answerKey: z.string().min(1), explanation: z.string() });
 export type ReadingQuestionOutput=z.infer<typeof readingQuestionObject>;
-export const readingQuestionSchema = z.preprocess(value=>{const row=record(value);return{...row,type:normalizeQuestionType(row.type),prompt:first(row,"prompt","question","text"),answerKey:first(row,"answerKey","correctAnswer","correct_answer","answer"),explanation:first(row,"explanation","rationale")??""}},readingQuestionObject) as z.ZodType<ReadingQuestionOutput>;
+export const readingQuestionSchema = z.preprocess(value=>{const row=record(value);const options=row.options;return{...row,type:normalizeQuestionType(row.type),prompt:first(row,"prompt","question","text"),answerKey:normalizeAnswerKey(first(row,"answerKey","correctAnswer","correct_answer","answer"),options),explanation:first(row,"explanation","rationale")??""}},readingQuestionObject) as z.ZodType<ReadingQuestionOutput>;
 const readingArticleObject=z.object({ title: z.string(), body: z.string().min(100), translation: z.string().optional(), level, audience: z.string(), topic: z.string(), targetVocabulary: z.array(z.string()), targetGrammar: z.array(z.string()), summary: z.string(), questions: z.array(readingQuestionSchema).min(3), oralRetellingPrompt: z.string(), writingExtensionPrompt: z.string() });
 export type ReadingArticleOutput=z.infer<typeof readingArticleObject>;
 export const readingArticleSchema = z.preprocess(value=>{const root=record(value);const wrapped=record(first(root,"article","lesson","reading"));const row={...root,...wrapped};return{...row,body:first(row,"body","content","text","passage"),audience:first(row,"audience","targetAudience","target_audience"),topic:first(row,"topic","theme","subject"),targetVocabulary:first(row,"targetVocabulary","target_vocabulary","vocabulary")??[],targetGrammar:first(row,"targetGrammar","target_grammar","grammar")??[],summary:first(row,"summary","abstract"),questions:first(root,"questions","comprehensionQuestions","comprehension_questions")??first(row,"questions","comprehensionQuestions","comprehension_questions"),oralRetellingPrompt:first(row,"oralRetellingPrompt","oral_retelling_prompt","retellingPrompt")??"Retell the article in your own words.",writingExtensionPrompt:first(row,"writingExtensionPrompt","writing_extension_prompt","writingPrompt")??"Write a short response related to the article."}},readingArticleObject) as z.ZodType<ReadingArticleOutput>;

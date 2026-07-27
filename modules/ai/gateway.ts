@@ -16,7 +16,11 @@ async function loadCandidates(purpose: AIUsagePurpose, preferredModelId?: string
     where: { purpose },
     include: { models: { where: { enabled: true }, orderBy: { priority: "asc" }, include: { model: { include: { provider: true } } } } }
   });
-  const candidates: Candidate[] = route?.enabled ? route.models.filter(({ model }) => model.enabled && model.provider.enabled && !model.provider.deletedAt).map(({ model }) => ({ model })) : [];
+  let candidates: Candidate[] = route?.enabled ? route.models.filter(({ model }) => model.enabled && model.provider.enabled && !model.provider.deletedAt).map(({ model }) => ({ model })) : [];
+  if (!candidates.length) {
+    const defaults = await db.aIModel.findMany({ where: { enabled: true, provider: { enabled: true, deletedAt: null } }, include: { provider: true }, orderBy: [{ isDefault: "desc" }, { priority: "asc" }] });
+    candidates = defaults.map(model=>({model}));
+  }
   if (!preferredModelId || candidates.some(({ model }) => model.id === preferredModelId)) return preferredModelId
     ? candidates.toSorted((left, right) => Number(right.model.id === preferredModelId) - Number(left.model.id === preferredModelId)) : candidates;
   const preferred = await db.aIModel.findUnique({ where: { id: preferredModelId }, include: { provider: true } });
@@ -43,7 +47,8 @@ async function instantiate(candidate: Candidate) {
 }
 
 export async function routedChat(purpose: AIUsagePurpose, input: Omit<ChatInput, "model">, userId?: string, preferredModelId?: string): Promise<ChatResponse> {
-  if (userId && !userLimiter.check(`${userId}:${purpose}`).allowed) throw new Error("AI_USER_RATE_LIMIT");
+  const backgroundPurposes = new Set<AIUsagePurpose>(["VOCABULARY","READING","GRAMMAR","SCENARIO"]);
+  if (userId && !backgroundPurposes.has(purpose) && !userLimiter.check(`${userId}:${purpose}`).allowed) throw new Error("AI_USER_RATE_LIMIT");
   const candidates = await loadCandidates(purpose, preferredModelId);
   if (!candidates.length) throw new Error(`AI_ROUTE_NOT_CONFIGURED:${purpose}`);
   const requestId = randomUUID(); let fallbackFromId: string | undefined; let attemptNo = 0;

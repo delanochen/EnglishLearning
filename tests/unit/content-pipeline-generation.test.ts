@@ -46,6 +46,12 @@ describe("pipeline vocabulary contract", () => {
     expect(pipelineVocabularySchema.parse(vocabulary).definitionZh).toBe("准备");
   });
 
+  it("normalizes an AI answer letter to the complete option text", () => {
+    const withLetter = structuredClone(vocabulary);
+    withLetter.exercises[0].answerKey = "A";
+    expect(pipelineVocabularySchema.parse(withLetter).exercises[0].answerKey).toBe("prepare");
+  });
+
   it("rejects a question whose answer is not one of its options", () => {
     const invalid = structuredClone(vocabulary);
     invalid.exercises[0].answerKey = "missing";

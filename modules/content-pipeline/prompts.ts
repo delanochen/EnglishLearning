@@ -11,5 +11,5 @@ const system:Partial<Record<ContentGenerationJobType,string>>={
 
 export function generationMessages(type:ContentGenerationJobType,context:GenerationContext){
   const instruction=system[type]; if(!instruction)throw new Error(`UNSUPPORTED_GENERATION_JOB:${type}`);
-  return [{role:"system" as const,content:`${instruction} Content must be safe for families and must not include real personal data, medical/legal/financial advice, advertisements, copied passages, or source claims that cannot be verified.`},{role:"user" as const,content:JSON.stringify(context)}];
+  return [{role:"system" as const,content:`${instruction} For every multiple-choice question, answerKey must contain the complete correct option text, not a letter such as A/B/C and not an option number. Content must be safe for families and must not include real personal data, medical/legal/financial advice, advertisements, copied passages, or source claims that cannot be verified.`},{role:"user" as const,content:JSON.stringify(context)}];
 }
